@@ -1,8 +1,7 @@
 from __future__ import annotations
-from datetime import datetime, date, time as time_type
+from datetime import datetime, date
 from typing import Optional, List, Any
-from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
-import json
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 # ─── Geometry helpers ──────────────────────────────────────────────────────────
@@ -29,18 +28,20 @@ class AccidentSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    date: Optional[date] = None
-    time: Optional[time_type] = None
-    fatalities: Optional[int] = None
+    event_time: Optional[datetime] = None
+    city: Optional[str] = None
+    street_name: Optional[str] = None
+    fatalities_count: Optional[int] = None
     serious_injuries: Optional[int] = None
     minor_injuries: Optional[int] = None
-    total_material_damage: Optional[int] = None
-    accident_type: Optional[int] = None
-    road_category: Optional[int] = None
-    weather_conditions: Optional[int] = None
-    road_surface_condition: Optional[int] = None
+    damage_czk: Optional[int] = None
+    severity: Optional[str] = None
+    accident_type: Optional[str] = None
+    road_type_code: Optional[str] = None
+    weather_condition: Optional[str] = None
+    road_surface: Optional[str] = None
 
-    # Lat/lng extracted from geom at query time (added as plain floats)
+    # Lat/lng extracted from location_geog at query time
     lat: Optional[float] = None
     lng: Optional[float] = None
 
@@ -73,7 +74,7 @@ class ClusterBase(BaseModel):
 
     road_name: Optional[str] = None
     road_number: Optional[str] = None
-    road_category: Optional[int] = None
+    road_category: Optional[str] = None
 
     bbox_min_lat: Optional[float] = None
     bbox_min_lng: Optional[float] = None
@@ -86,10 +87,12 @@ class ClusterBase(BaseModel):
 
 
 class ClusterListItem(ClusterBase):
-    """Lightweight cluster representation for list endpoints."""
+    """Cluster representation for list endpoints."""
 
     centroid_geojson: Optional[dict] = None
     road_point_geojson: Optional[dict] = None
+    road_segment_geojson: Optional[dict] = None
+    convex_hull_geojson: Optional[dict] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -105,6 +108,8 @@ class ClusterListItem(ClusterBase):
                 result[col.name] = getattr(obj, col.name)
             result["centroid_geojson"] = _wkb_to_geojson(getattr(obj, "centroid", None))
             result["road_point_geojson"] = _wkb_to_geojson(getattr(obj, "road_point", None))
+            result["road_segment_geojson"] = _wkb_to_geojson(getattr(obj, "road_segment", None))
+            result["convex_hull_geojson"] = _wkb_to_geojson(getattr(obj, "convex_hull", None))
             return result
         return data
 
@@ -139,9 +144,9 @@ class ClusterDetail(ClusterBase):
                 acc = ca.accident
                 acc_dict = None
                 if acc is not None:
-                    acc_dict = {col.name: getattr(acc, col.name) for col in acc.__table__.columns if col.name != "geom"}
-                    # Extract lat/lng from geom
-                    geojson = _wkb_to_geojson(getattr(acc, "geom", None))
+                    acc_dict = {col.name: getattr(acc, col.name) for col in acc.__table__.columns if col.name != "location_geog"}
+                    # Extract lat/lng from location_geog
+                    geojson = _wkb_to_geojson(getattr(acc, "location_geog", None))
                     if geojson and geojson.get("type") == "Point":
                         coords = geojson.get("coordinates", [])
                         if len(coords) >= 2:

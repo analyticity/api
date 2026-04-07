@@ -4,16 +4,12 @@ Router: /api/clusters
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy import select, func, desc
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
-# from app.database import get_db
-from app.models.cluster import DangerousRoadCluster, ClusterAccident
-from app.models.accident import Accident
+from app.config import get_settings
+from app.database import get_db_optional
 from app.schemas.cluster import (
     ClusterListResponse,
     ClusterListItem,
@@ -21,53 +17,80 @@ from app.schemas.cluster import (
     ClusterRunRequest,
     ClusterRunResponse,
 )
+from app.repositories.base import AccidentRepository, RoadSegmentRepository, ClusterRepository
+from app.repositories.accident import PostgresAccidentRepository, CsvAccidentRepository
+from app.repositories.road_segment import PostgresRoadSegmentRepository, CsvRoadSegmentRepository
+from app.repositories.cluster import PostgresClusterRepository, InMemoryClusterRepository
 from app.services.clustering import run_clustering
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 router = APIRouter(prefix="/api/clusters", tags=["clusters"])
 
+# Singleton in-memory repo — state persists across requests, resets on restart
+_in_memory_cluster_repo = InMemoryClusterRepository()
+
+
+# ─── Repository dependency factories ──────────────────────────────────────────
+
+def get_accident_repo(db: AsyncSession = Depends(get_db_optional)) -> AccidentRepository:
+    if settings.data_source == "csv":
+        return CsvAccidentRepository(settings.accidents_csv_path)
+    return PostgresAccidentRepository(db)
+
+
+def get_road_repo(db: AsyncSession = Depends(get_db_optional)) -> RoadSegmentRepository:
+    if settings.data_source == "csv":
+        return CsvRoadSegmentRepository(settings.road_segments_csv_path)
+    return PostgresRoadSegmentRepository(db)
+
+
+def get_cluster_repo(db: AsyncSession = Depends(get_db_optional)) -> ClusterRepository:
+    if db is None:
+        return _in_memory_cluster_repo
+    return PostgresClusterRepository(db)
+
+
+# ─── POST /api/clusters/run ────────────────────────────────────────────────────
+
+@router.post(
+    "/run",
+    response_model=ClusterRunResponse,
+    summary="Run DBSCAN clustering and persist results",
+)
+async def trigger_clustering(
+    request: ClusterRunRequest,
+    accident_repo: AccidentRepository = Depends(get_accident_repo),
+    road_repo: RoadSegmentRepository = Depends(get_road_repo),
+    cluster_repo: ClusterRepository = Depends(get_cluster_repo),
+) -> ClusterRunResponse:
+    try:
+        return await run_clustering(
+            accident_repo=accident_repo,
+            road_repo=road_repo,
+            cluster_repo=cluster_repo,
+            request=request,
+        )
+    except Exception as exc:
+        logger.exception("Clustering failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Clustering error: {exc}") from exc
+
+
 # ─── GET /api/clusters ─────────────────────────────────────────────────────────
+
 @router.get(
     "",
     response_model=ClusterListResponse,
     summary="List dangerous road clusters",
 )
 async def list_clusters(
-    # TODO: add pagination/sorting/filtering
-
-    # # Pagination
-    # page: int = Query(1, ge=1, description="Page number (1-based)"),
-    # page_size: int = Query(50, ge=1, le=500, description="Items per page"),
-    # # Filters
-    # run_id: Optional[str] = Query(None, description="Filter by clustering run UUID"),
-    # is_active: Optional[bool] = Query(True, description="Filter by active status"),
-    # min_severity: Optional[float] = Query(None, description="Minimum severity score"),
-    # min_accidents: Optional[int] = Query(None, description="Minimum accident count"),
-    # region: Optional[int] = Query(None, description="Filter by region code"),
-    # # Sorting
-    # sort_by: str = Query(
-    #     "severity_score",
-    #     description="Field to sort by: severity_score | accident_count | created_at",
-    # ),
-    # sort_desc: bool = Query(True, description="Sort descending"),
-    # # Bounding box filter
-    # bbox: Optional[str] = Query(
-    #     None,
-    #     description="Bounding box filter: 'min_lng,min_lat,max_lng,max_lat'",
-    # ),
-    db: AsyncSession = Depends(get_db),
+    cluster_repo: ClusterRepository = Depends(get_cluster_repo),
 ) -> ClusterListResponse:
-    stmt = select(DangerousRoadCluster)
+    rows = await cluster_repo.list_clusters()
+    items = [ClusterListItem.model_validate(row) for row in rows]
+    return ClusterListResponse(items=items)
 
-    result = await db.execute(stmt)
-    clusters = result.scalars().all()
-
-    items = [ClusterListItem.model_validate(c) for c in clusters]
-
-    return ClusterListResponse(
-        items=items
-    )
 
 # ─── GET /api/clusters/{cluster_id} ────────────────────────────────────────────
 
@@ -78,25 +101,12 @@ async def list_clusters(
 )
 async def get_cluster(
     cluster_id: int,
-    db: AsyncSession = Depends(get_db),
+    cluster_repo: ClusterRepository = Depends(get_cluster_repo),
 ) -> ClusterDetail:
-
-    stmt = (
-        select(DangerousRoadCluster)
-        .where(DangerousRoadCluster.id == cluster_id)
-        .options(
-            selectinload(DangerousRoadCluster.cluster_accidents).selectinload(
-                ClusterAccident.accident
-            )
-        )
-    )
-    result = await db.execute(stmt)
-    cluster = result.scalar_one_or_none()
-
-    if cluster is None:
+    row = await cluster_repo.get_cluster(cluster_id)
+    if row is None:
         raise HTTPException(status_code=404, detail=f"Cluster {cluster_id} not found")
-
-    return ClusterDetail.model_validate(cluster)
+    return ClusterDetail.model_validate(row)
 
 
 # ─── GET /api/clusters/{cluster_id}/accidents ──────────────────────────────────
@@ -109,41 +119,16 @@ async def list_cluster_accidents(
     cluster_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
-    db: AsyncSession = Depends(get_db),
+    cluster_repo: ClusterRepository = Depends(get_cluster_repo),
 ):
-    # Check cluster exists
-    exists_stmt = select(DangerousRoadCluster.id).where(
-        DangerousRoadCluster.id == cluster_id
-    )
-    exists = (await db.execute(exists_stmt)).scalar_one_or_none()
-    if exists is None:
+    result = await cluster_repo.list_accidents(cluster_id, page, page_size)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"Cluster {cluster_id} not found")
-
-    stmt = (
-        select(ClusterAccident)
-        .where(ClusterAccident.cluster_id == cluster_id)
-        .options(selectinload(ClusterAccident.accident))
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-
-    count_result = await db.execute(
-        select(func.count()).where(ClusterAccident.cluster_id == cluster_id)
-    )
-    total = count_result.scalar_one()
-
+    total, items = result
     return {
         "cluster_id": cluster_id,
         "total": total,
         "page": page,
         "page_size": page_size,
-        "items": [
-            {
-                "accident_id": ca.accident_id,
-                "distance_to_road_m": ca.distance_to_road_m,
-            }
-            for ca in items
-        ],
+        "items": items,
     }
