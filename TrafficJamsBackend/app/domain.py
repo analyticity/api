@@ -26,19 +26,19 @@ class SnapResult:
     road_point_wkt: Optional[str] = None      # POINT WKT in SRID 4326
     road_segment_wkt: Optional[str] = None    # LINESTRING WKT in SRID 4326
     road_name: Optional[str] = None
-    road_ref: Optional[str] = None            # e.g. "I/43", "E55"
+    road_ref: Optional[str] = None            # ID of the road segment
     highway: Optional[str] = None             # OSM highway tag e.g. "primary"
 
 
 @dataclass
 class ClusterData:
-    """All computed data for one cluster, passed to ClusterRepository for persistence."""
+    """All computed data for one cluster."""
     run_id: str
     dbscan_label: int
     eps_meters: float
     min_samples: int
     centroid_lat: float
     centroid_lng: float
-    points: List[AccidentPoint]
+    accidents: List[AccidentPoint]
     snap: SnapResult
     convex_hull_wkt: Optional[str] = None

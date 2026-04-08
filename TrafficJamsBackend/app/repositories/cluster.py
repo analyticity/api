@@ -105,18 +105,18 @@ class PostgresClusterRepository(ClusterRepository):
         return row[0] if row and row[0] else None
 
     async def save_cluster(self, data: ClusterData) -> None:
-        lats = np.array([p.lat for p in data.points])
-        lons = np.array([p.lng for p in data.points])
+        lats = np.array([p.lat for p in data.accidents])
+        lons = np.array([p.lng for p in data.accidents])
 
-        fatalities_total = sum(p.fatalities for p in data.points)
-        serious_total = sum(p.serious_injuries for p in data.points)
-        minor_total = sum(p.minor_injuries for p in data.points)
-        damage_total = sum(p.total_material_damage for p in data.points)
-        score = _severity_score(len(data.points), fatalities_total, serious_total, minor_total, damage_total)
+        fatalities_total = sum(p.fatalities for p in data.accidents)
+        serious_total = sum(p.serious_injuries for p in data.accidents)
+        minor_total = sum(p.minor_injuries for p in data.accidents)
+        damage_total = sum(p.total_material_damage for p in data.accidents)
+        score = _severity_score(len(data.accidents), fatalities_total, serious_total, minor_total, damage_total)
 
-        road_numbers = [p.road_number for p in data.points if p.road_number]
+        road_numbers = [p.road_number for p in data.accidents if p.road_number]
         dominant_road_num = max(set(road_numbers), key=road_numbers.count) if road_numbers else data.snap.road_ref
-        road_cats = [p.road_category for p in data.points if p.road_category]
+        road_cats = [p.road_category for p in data.accidents if p.road_category]
         dominant_road_cat = max(set(road_cats), key=road_cats.count) if road_cats else data.snap.highway
 
         cluster = DangerousRoadCluster(
@@ -131,7 +131,7 @@ class PostgresClusterRepository(ClusterRepository):
             road_name=data.snap.road_name,
             road_number=dominant_road_num,
             road_category=dominant_road_cat,
-            accident_count=len(data.points),
+            accident_count=len(data.accidents),
             fatalities_total=fatalities_total,
             serious_injuries_total=serious_total,
             minor_injuries_total=minor_total,
@@ -154,7 +154,7 @@ class PostgresClusterRepository(ClusterRepository):
             except Exception:
                 pass
 
-        for p in data.points:
+        for p in data.accidents:
             dist = _haversine_m(p.lat, p.lng, road_lat, road_lng) if road_lat is not None else None
             self._session.add(ClusterAccident(
                 cluster_id=cluster.id,
@@ -277,17 +277,17 @@ class InMemoryClusterRepository(ClusterRepository):
         cluster_id = _CLUSTER_COUNTER
         now = datetime.now(timezone.utc)
 
-        lats = [p.lat for p in data.points]
-        lons = [p.lng for p in data.points]
-        fatalities_total = sum(p.fatalities for p in data.points)
-        serious_total = sum(p.serious_injuries for p in data.points)
-        minor_total = sum(p.minor_injuries for p in data.points)
-        damage_total = sum(p.total_material_damage for p in data.points)
-        score = _severity_score(len(data.points), fatalities_total, serious_total, minor_total, damage_total)
+        lats = [p.lat for p in data.accidents]
+        lons = [p.lng for p in data.accidents]
+        fatalities_total = sum(p.fatalities for p in data.accidents)
+        serious_total = sum(p.serious_injuries for p in data.accidents)
+        minor_total = sum(p.minor_injuries for p in data.accidents)
+        damage_total = sum(p.total_material_damage for p in data.accidents)
+        score = _severity_score(len(data.accidents), fatalities_total, serious_total, minor_total, damage_total)
 
-        road_numbers = [p.road_number for p in data.points if p.road_number]
+        road_numbers = [p.road_number for p in data.accidents if p.road_number]
         dominant_road_num = max(set(road_numbers), key=road_numbers.count) if road_numbers else data.snap.road_ref
-        road_cats = [p.road_category for p in data.points if p.road_category]
+        road_cats = [p.road_category for p in data.accidents if p.road_category]
         dominant_road_cat = max(set(road_cats), key=road_cats.count) if road_cats else data.snap.highway
 
         road_lat, road_lng = None, None
@@ -304,7 +304,7 @@ class InMemoryClusterRepository(ClusterRepository):
                 "distance_to_road_m": _haversine_m(p.lat, p.lng, road_lat, road_lng) if road_lat is not None else None,
                 "accident": None,
             }
-            for p in data.points
+            for p in data.accidents
         ]
 
         _CLUSTER_STORE[cluster_id] = {
@@ -313,7 +313,7 @@ class InMemoryClusterRepository(ClusterRepository):
             "dbscan_label": data.dbscan_label,
             "eps_meters": data.eps_meters,
             "min_samples": data.min_samples,
-            "accident_count": len(data.points),
+            "accident_count": len(data.accidents),
             "fatalities_total": fatalities_total,
             "serious_injuries_total": serious_total,
             "minor_injuries_total": minor_total,

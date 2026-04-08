@@ -108,7 +108,7 @@ async def run_clustering(
             min_samples=request.min_samples,
             centroid_lat=centroid_lat,
             centroid_lng=centroid_lng,
-            points=cluster_points,
+            accidents=cluster_points,
             snap=snap,
             convex_hull_wkt=convex_hull_wkt,
         ))
