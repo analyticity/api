@@ -1,10 +1,11 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from modules.map.schema import (
     RoadSegmentResponse,
     SegmentStatistics,
     StreetSegmentsResponse,
+    RoadSegmentByIdResponse,
     AccidentResponse,
     AccidentsResponse,
     AlertResponse,
@@ -91,6 +92,52 @@ def get_street_segments_from_example(
         date_from=date_from,
         date_to=date_to
     )
+
+
+def get_road_segment_by_id_from_example(
+    segment_id: int,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None
+) -> Optional[RoadSegmentByIdResponse]:
+    """Get single road segment by ID from example data"""
+
+    segments_data = ExampleDataLoader.get_road_segments(None)
+
+    segment = None
+    for seg in segments_data:
+        if seg.get("id") == segment_id:
+            segment = seg
+            break
+
+    if not segment:
+        logger.warning(f"Road segment {segment_id} not found in example data")
+        return None
+
+    coordinates = segment.get("geog")
+    if not coordinates:
+        logger.warning(f"No geometry found for segment {segment_id}")
+        return None
+
+    statistics = SegmentStatistics()
+    if date_from and date_to:
+        statistics = get_segment_statistics_from_example(segment_id, date_from, date_to)
+
+    road_ref = segment.get("road_ref")
+    segment_response = RoadSegmentResponse(
+        id=segment.get("id"),
+        osm_id=segment.get("osm_id"),
+        name=segment.get("name"),
+        road_ref=str(road_ref) if road_ref is not None else None,
+        road_class=str(segment.get("road_class")),
+        city=segment.get("city"),
+        max_speed=segment.get("max_speed"),
+        coordinates=coordinates,
+        statistics=statistics
+    )
+
+    logger.info(f"Loaded segment {segment_id} from example data")
+
+    return RoadSegmentByIdResponse(segment=segment_response)
 
 
 def get_accidents_from_example(

@@ -63,6 +63,10 @@ class StreetSegmentsResponse(BaseModel):
     date_to: datetime
 
 
+class RoadSegmentByIdResponse(BaseModel):
+    segment: RoadSegmentResponse
+
+
 class AccidentsRequest(BaseModel):
     street_names: List[str] = Field(default=[], description="List of street names to filter. If empty, returns all accidents.")
     date_from: datetime = Field(..., description="Start date for filtering")

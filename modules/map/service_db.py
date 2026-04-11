@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import Session
 from geoalchemy2.functions import ST_AsGeoJSON
@@ -10,6 +10,7 @@ from modules.map.schema import (
     RoadSegmentResponse,
     SegmentStatistics,
     StreetSegmentsResponse,
+    RoadSegmentByIdResponse,
     AccidentResponse,
     AccidentsResponse,
     AlertResponse,
@@ -132,6 +133,52 @@ def get_street_segments_from_db(
         date_from=date_from,
         date_to=date_to
     )
+
+
+def get_road_segment_by_id_from_db(
+    db: Session,
+    segment_id: int,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None
+) -> Optional[RoadSegmentByIdResponse]:
+    """Get single road segment by ID from database"""
+
+    segment = db.query(
+        RoadSegment.id,
+        RoadSegment.osm_id,
+        RoadSegment.name,
+        RoadSegment.road_ref,
+        RoadSegment.road_class,
+        RoadSegment.city,
+        RoadSegment.max_speed,
+        ST_AsGeoJSON(RoadSegment.geog).label('geog_json')
+    ).filter(RoadSegment.id == segment_id).first()
+
+    if not segment:
+        logger.warning(f"Road segment {segment_id} not found in database")
+        return None
+
+    coordinates = parse_geojson_to_coordinates(segment.geog_json)
+
+    statistics = SegmentStatistics()
+    if date_from and date_to:
+        statistics = get_segment_statistics_from_db(db, segment_id, date_from, date_to)
+
+    segment_response = RoadSegmentResponse(
+        id=segment.id,
+        osm_id=segment.osm_id,
+        name=segment.name,
+        road_ref=segment.road_ref,
+        road_class=segment.road_class,
+        city=segment.city,
+        max_speed=segment.max_speed,
+        coordinates=coordinates,
+        statistics=statistics
+    )
+
+    logger.info(f"Loaded segment {segment_id} from database")
+
+    return RoadSegmentByIdResponse(segment=segment_response)
 
 
 def get_accidents_from_db(

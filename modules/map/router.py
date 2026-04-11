@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Annotated, Optional
+from datetime import datetime
 
 from modules.map.schema import (
     StreetSegmentsRequest,
     StreetSegmentsResponse,
+    RoadSegmentByIdResponse,
     AccidentsRequest,
     AccidentsResponse,
     AlertsRequest,
@@ -14,7 +16,7 @@ from modules.map.schema import (
     RestrictionsRequest,
     RestrictionsResponse
 )
-from modules.map.service import get_street_segments, get_accidents, get_alerts, get_jams, get_restrictions
+from modules.map.service import get_street_segments, get_road_segment_by_id, get_accidents, get_alerts, get_jams, get_restrictions
 from db.connection_to_db import get_db
 from core.logging_config import get_logger
 
@@ -112,6 +114,106 @@ def get_street_segments_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve street segments: {str(e)}"
+        )
+
+
+@router.get(
+    "/road-segment/{segment_id}",
+    response_model=RoadSegmentByIdResponse,
+    summary="Get road segment by ID",
+    description="""
+    Retrieve single road segment by its ID.
+    
+    Returns road segment details including:
+    - OSM ID and metadata
+    - Road class and speed limit
+    - Coordinate polyline
+    - Event statistics (if date range provided)
+    
+    **Query parameters (optional):**
+    - date_from: Start date for statistics calculation
+    - date_to: End date for statistics calculation
+    
+    If date range is not provided, statistics will be empty (all zeros).
+    
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully retrieved road segment",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "segment": {
+                            "id": 8107,
+                            "osm_id": 421610453,
+                            "name": "Jihlavská",
+                            "road_ref": "602",
+                            "road_class": "secondary",
+                            "city": "Brno",
+                            "max_speed": 50,
+                            "coordinates": [[16.563631, 49.174137], [16.564209, 49.174157]],
+                            "statistics": {
+                                "jams_count": 5,
+                                "accidents_count": 3,
+                                "alerts_count": 2,
+                                "restrictions_count": 1
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        404: {"description": "Road segment not found"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_road_segment_by_id_endpoint(
+    segment_id: int,
+    db: Annotated[Optional[Session], Depends(get_db)],
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None
+) -> RoadSegmentByIdResponse:
+    """
+    Get single road segment by ID.
+
+    Args:
+        segment_id: Road segment ID
+        db: Database session (None if unavailable, triggers fallback mode)
+        date_from: Optional start date for statistics
+        date_to: Optional end date for statistics
+
+    Returns:
+        Road segment with coordinates and statistics
+    """
+
+    logger.info(f"Road segment by ID request: {segment_id}, date_range: {date_from} to {date_to}")
+
+    try:
+        result = get_road_segment_by_id(
+            db=db,
+            segment_id=segment_id,
+            date_from=date_from,
+            date_to=date_to
+        )
+
+        if not result:
+            logger.warning(f"Road segment {segment_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Road segment with ID {segment_id} not found"
+            )
+
+        logger.info(f"Returning segment {segment_id}")
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing road segment by ID request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve road segment: {str(e)}"
         )
 
 
