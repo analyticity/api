@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class StreetSegmentsRequest(BaseModel):
-    street_names: List[str] = Field(..., description="List of street names to fetch")
+    street_names: List[str] = Field(default=[], description="List of street names to fetch. If empty, returns all segments.")
     date_from: datetime = Field(..., description="Start date for statistics")
     date_to: datetime = Field(..., description="End date for statistics")
 

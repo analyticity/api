@@ -16,7 +16,9 @@ logger = get_logger(__name__)
     response_model=StreetSegmentsResponse,
     summary="Get street segments with statistics",
     description="""
-    Retrieve all road segments for specified streets with event statistics.
+    Retrieve road segments for specified streets with event statistics.
+    
+    If street_names is empty or not provided, returns all road segments.
     
     Returns coordinate polylines for each segment along with counts of:
     - Traffic jams
@@ -79,7 +81,7 @@ def get_street_segments_endpoint(
     """
 
     logger.info(
-        f"Street segments request: {len(request.street_names)} streets, "
+        f"Street segments request: {len(request.street_names) if request.street_names else 'all'} streets, "
         f"date range: {request.date_from} to {request.date_to}"
     )
 

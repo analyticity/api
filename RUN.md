@@ -39,7 +39,7 @@ POSTGRES_PASSWORD_BRNO=your_password
 When running without a database connection:
 - API loads example data from `example_data_from_database/` folder
 - All endpoints work with mock data
-- Perfect for testing and development without database setup
+- Enables testing and development without database setup
 - Status visible at `/health` endpoint
 
 ### Testing Fallback Mode

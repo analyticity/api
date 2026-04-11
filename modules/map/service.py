@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from geoalchemy2.functions import ST_AsGeoJSON
 import json
 
-from modules.map.model import RoadSegment, TrafficJam, Accident, Alert, Restriction
+from models import RoadSegment, TrafficJam, Accident, Alert, Restriction
 from modules.map.schema import (
     RoadSegmentResponse,
     SegmentStatistics,
@@ -108,7 +108,7 @@ def get_street_segments_from_db(
 ) -> StreetSegmentsResponse:
     """Get all road segments for given streets with event statistics from database"""
 
-    segments_query = db.query(
+    query = db.query(
         RoadSegment.id,
         RoadSegment.osm_id,
         RoadSegment.name,
@@ -117,9 +117,12 @@ def get_street_segments_from_db(
         RoadSegment.city,
         RoadSegment.max_speed,
         ST_AsGeoJSON(RoadSegment.geog).label('geog_json')
-    ).filter(
-        RoadSegment.name.in_(street_names)
-    ).all()
+    )
+
+    if street_names:
+        query = query.filter(RoadSegment.name.in_(street_names))
+
+    segments_query = query.all()
 
     segments_response = []
     for segment in segments_query:
@@ -157,7 +160,7 @@ def get_street_segments_from_example(
 ) -> StreetSegmentsResponse:
     """Get road segments from example data as fallback"""
 
-    segments_data = ExampleDataLoader.get_road_segments(street_names)
+    segments_data = ExampleDataLoader.get_road_segments(street_names if street_names else None)
 
     segments_response = []
     for segment in segments_data:
