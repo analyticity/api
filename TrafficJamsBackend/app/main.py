@@ -10,7 +10,8 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import async_engine, Base
-from app.routers import clusters_router
+from app.routers import clusters_router, prediction_router
+from app.services.prediction import PredictionService
 
 # Import models so that Base.metadata is populated before create_all
 import app.models  # noqa: F401
@@ -23,31 +24,22 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-# TODO: Enable checking of DB connection
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Load ML models on startup; dispose DB engine on shutdown."""
+    logger.info("Starting up Accident Clustering API…")
+    PredictionService.load()
+    yield
+    logger.info("Shutting down — disposing DB engine.")
+    await async_engine.dispose()
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """
-#     Startup: verify DB connection.
-#     Shutdown: dispose engine.
-#     """
-#     logger.info("Starting up Accident Clustering API…")
-#     async with async_engine.connect() as conn:
-#         from sqlalchemy import text
-#         await conn.execute(text("SELECT 1"))
-#         logger.info("Database connection OK.")
-#     yield
-#     logger.info("Shutting down — disposing DB engine.")
-#     await async_engine.dispose()
 
-# Create Fast API app
+# Create FastAPI app
 app = FastAPI(
     title=settings.app_title,
     version=settings.app_version,
-    description=(
-        "REST API for traffic jams analysis"
-    ),
-    # lifespan=lifespan,
+    description="REST API for traffic jams analysis",
+    lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -63,6 +55,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(clusters_router)
+app.include_router(prediction_router)
 
 # Health check
 @app.get("/health", tags=["meta"])

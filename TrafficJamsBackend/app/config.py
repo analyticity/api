@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     accidents_csv_path: str = "../../police_data.csv"
     road_segments_csv_path: str = "../../road_segments.csv"
 
+    # ML models directory (relative to working directory or absolute)
+    models_dir: str = "models"
+
     # App
     app_title: str = "Accidents API"
     app_version: str = "1.0.0"

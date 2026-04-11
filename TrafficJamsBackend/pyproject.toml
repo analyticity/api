@@ -10,6 +10,7 @@ dependencies = [
     "fastapi>=0.135.3",
     "geoalchemy2>=0.18.4",
     "greenlet>=3.3.2",
+    "httpx>=0.28.1",
     "numpy>=2.4.4",
     "osmnx>=2.1.0",
     "pandas>=3.0.2",

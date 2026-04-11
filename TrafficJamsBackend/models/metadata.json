@@ -1,0 +1,25 @@
+{
+  "trained_at": "2026-04-08T21:02:35.620569+00:00",
+  "n_train_samples": 200,
+  "n_test_samples": 50,
+  "dbscan_eps_meters": 100.0,
+  "dbscan_min_samples": 3,
+  "clf_roc_auc": 0.32,
+  "reg_mae_czk": 63961.29,
+  "reg_r2_log_scale": 0.2382,
+  "features": [
+    "road_type_code",
+    "weather_condition",
+    "road_surface",
+    "light_condition",
+    "road_condition",
+    "accident_type",
+    "cause_primary",
+    "hour",
+    "day_of_week",
+    "month",
+    "is_weekend",
+    "is_night",
+    "road_number_int"
+  ]
+}
