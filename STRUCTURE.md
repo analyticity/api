@@ -111,6 +111,47 @@ Interactive API documentation available at:
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+## Docker Deployment
+
+### Docker Compose
+
+The application includes Docker Compose configuration with two services:
+
+**Services:**
+- `api` - FastAPI application (Python 3.13)
+- `db` - TimescaleDB with PostGIS (PostgreSQL 16)
+
+**Features:**
+- Hot-reload enabled for development
+- Persistent database storage with Docker volumes
+- Automatic service dependency management
+- Environment variable configuration
+
+**Commands:**
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f api
+
+# Stop services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+```
+
+### Dockerfile
+
+Multi-stage build process:
+1. Base image: Python 3.13 slim
+2. Install system dependencies (PostgreSQL client, GCC)
+3. Install Python dependencies
+4. Copy application code
+5. Expose port 8000
+6. Run uvicorn server
+
 ## SQLAlchemy
 
 SQLAlchemy is a Python SQL toolkit and Object-Relational Mapping (ORM) library that:

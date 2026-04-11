@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: analyticity-api
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_HOST_BRNO=${POSTGRES_HOST_BRNO:-db}
+      - POSTGRES_PORT_BRNO=${POSTGRES_PORT_BRNO:-5432}
+      - POSTGRES_DB_BRNO=${POSTGRES_DB_BRNO:-analyticity}
+      - POSTGRES_USER_BRNO=${POSTGRES_USER_BRNO:-postgres}
+      - POSTGRES_PASSWORD_BRNO=${POSTGRES_PASSWORD_BRNO:-postgres}
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+    restart: unless-stopped
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: analyticity-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=analyticity
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/home/postgres/pgdata/data
+    restart: unless-stopped
+    command: postgres -c shared_preload_libraries=timescaledb
+
+volumes:
+  postgres_data:
+

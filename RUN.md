@@ -12,14 +12,14 @@ pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Access Documentation
+### Access Documentation
 
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 - **API Root**: http://localhost:8000/
 - **Health Check**: http://localhost:8000/health
 
-## Environment Variables
+### Environment Variables
 
 Create a `.env` file in the project root:
 

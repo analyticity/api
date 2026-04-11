@@ -4,6 +4,14 @@ FastAPI application for traffic data analytics backend with PostgreSQL + Timesca
 
 ## 🚀 Quick Start
 
+### Option 1: Docker (Recommended)
+
+```bash
+docker-compose up -d
+```
+
+### Option 2: Local Development
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -105,6 +113,7 @@ Database contains traffic and geographic data from various sources (Waze, Czech 
 
 - **[STRUCTURE.md](STRUCTURE.md)** - Detailed project structure and architecture
 - **[RUN.md](RUN.md)** - Runtime instructions
+- **[DOCKER.md](DOCKER.md)** - Docker deployment guide
 
 ## 📝 Notes
 
