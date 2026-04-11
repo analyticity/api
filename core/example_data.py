@@ -21,7 +21,10 @@ class ExampleDataLoader:
 
         if "time" in column_name.lower() or "date" in column_name.lower():
             try:
-                dt = datetime.fromisoformat(value.replace("+00", "+00:00"))
+                # PostgreSQL exports timestamps with space: "2025-01-12 19:10:00+00"
+                # Replace space with T for ISO format compatibility
+                iso_value = value.replace(" ", "T").replace("+00", "+00:00")
+                dt = datetime.fromisoformat(iso_value)
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 return dt
@@ -77,7 +80,7 @@ class ExampleDataLoader:
                 for row in reader:
                     parsed_row = {}
                     for key, value in row.items():
-                        if key == "geog":
+                        if key.endswith("_geog") or key == "geog":
                             parsed_row[key] = ExampleDataLoader._parse_geometry(value)
                         else:
                             parsed_row[key] = ExampleDataLoader._parse_value(value, key)

@@ -71,7 +71,9 @@ api/
 ### Module Structure
 Each feature module follows a consistent structure:
 - `router.py` - API endpoints and request handling
-- `service.py` - Business logic and data processing
+- `service.py` - Service orchestration and automatic fallback logic
+- `service_db.py` - Database operations and queries
+- `service_examples.py` - Example data operations for fallback mode
 - `schema.py` - Pydantic models for validation and serialization
 
 ### Database Models

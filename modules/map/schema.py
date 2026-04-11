@@ -62,3 +62,64 @@ class StreetSegmentsResponse(BaseModel):
     date_from: datetime
     date_to: datetime
 
+
+class AccidentsRequest(BaseModel):
+    street_names: List[str] = Field(default=[], description="List of street names to filter. If empty, returns all accidents.")
+    date_from: datetime = Field(..., description="Start date for filtering")
+    date_to: datetime = Field(..., description="End date for filtering")
+
+    @field_validator('date_from', 'date_to', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        """Ensure datetime objects are timezone-aware (UTC if not specified)"""
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        elif isinstance(v, datetime):
+            dt = v
+        else:
+            return v
+
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "street_names": ["Jihlavská"],
+                "date_from": "2026-04-01T00:00:00Z",
+                "date_to": "2026-04-11T23:59:59Z"
+            }
+        }
+
+
+class AccidentResponse(BaseModel):
+    id: int
+    event_time: Optional[datetime] = None
+    location: Optional[Polyline] = None
+    city: Optional[str] = None
+    street_name: Optional[str] = None
+    road_number: Optional[str] = None
+    accident_type: Optional[str] = None
+    accident_subtype: Optional[str] = None
+    severity: Optional[str] = None
+    fatalities_count: Optional[int] = None
+    serious_injuries: Optional[int] = None
+    minor_injuries: Optional[int] = None
+    persons_involved: Optional[int] = None
+    vehicles_involved: Optional[int] = None
+    damage_czk: Optional[int] = None
+    weather_condition: Optional[str] = None
+    road_surface: Optional[str] = None
+    light_condition: Optional[str] = None
+    alcohol_involved: Optional[bool] = None
+    drugs_involved: Optional[bool] = None
+    segment_id: Optional[int] = None
+
+
+class AccidentsResponse(BaseModel):
+    accidents: List[AccidentResponse]
+    total_count: int
+    date_from: datetime
+    date_to: datetime
+
