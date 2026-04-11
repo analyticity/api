@@ -31,44 +31,45 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-_HIGHWAY_WHITELIST = (
-    "motorway", "motorway_link", "trunk", "trunk_link",
-    "primary", "primary_link", "secondary", "secondary_link",
-    "tertiary", "tertiary_link", "unclassified", "residential", "road",
-)
-_ROADS_TABLE = "planet_osm_line"
-_ROADS_SRID = 3857
-
-
 class PostgresRoadSegmentRepository(RoadSegmentRepository):
-    """Snaps to roads using PostGIS ST_ClosestPoint on the planet_osm_line table."""
+    """
+    Snaps to roads using PostGIS ST_ClosestPoint on the road_segments table
+    (populated by scripts/load_csv_to_db.py).
+
+    The geometry column (geog) is GEOMETRY(LINESTRING, 4326).
+    Casting to ::geography enables meter-based ST_DWithin / ST_Distance.
+    """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def snap_to_road(self, lat: float, lng: float, max_distance_m: float) -> SnapResult:
-        highway_list = ", ".join(f"'{h}'" for h in _HIGHWAY_WHITELIST)
-        query = text(f"""
+        query = text("""
             WITH input_point AS (
-                SELECT ST_Transform(ST_SetSRID(ST_MakePoint(:lng, :lat), 4326), {_ROADS_SRID}) AS geom
+                SELECT ST_SetSRID(ST_MakePoint(:lng, :lat), 4326) AS geom
             ),
             nearby AS (
-                SELECT r.way, r.name, r.ref, r.highway,
-                       ST_Distance(r.way, p.geom) AS dist_m
-                FROM {_ROADS_TABLE} r, input_point p
-                WHERE r.highway IN ({highway_list})
-                  AND ST_DWithin(r.way, p.geom, :max_dist)
-                ORDER BY dist_m LIMIT 1
+                SELECT r.geog AS way, r.name, r.road_ref, r.road_class,
+                       ST_Distance(r.geog::geography, ip.geom::geography) AS dist_m
+                FROM road_segments r, input_point ip
+                WHERE ST_DWithin(r.geog::geography, ip.geom::geography, :max_dist)
+                ORDER BY dist_m
+                LIMIT 1
             )
             SELECT
-                ST_AsText(ST_Transform(ST_ClosestPoint(nr.way, ip.geom), 4326)) AS road_point_wkt,
-                ST_AsText(ST_Transform(nr.way, 4326))                           AS road_segment_wkt,
-                nr.name, nr.ref, nr.highway
-            FROM nearby nr, input_point ip LIMIT 1
+                ST_AsText(ST_ClosestPoint(nr.way, ip.geom)) AS road_point_wkt,
+                ST_AsText(nr.way)                           AS road_segment_wkt,
+                nr.name, nr.road_ref, nr.road_class
+            FROM nearby nr, input_point ip
+            LIMIT 1
         """)
         try:
-            result = await self._session.execute(query, {"lat": lat, "lng": lng, "max_dist": max_distance_m})
-            row = result.fetchone()
+            # Use a savepoint so a query failure doesn't abort the outer transaction
+            async with self._session.begin_nested():
+                result = await self._session.execute(
+                    query, {"lat": lat, "lng": lng, "max_dist": max_distance_m}
+                )
+                row = result.fetchone()
             if row is None:
                 return SnapResult()
             return SnapResult(

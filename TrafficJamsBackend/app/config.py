@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     data_source: str = "csv"
 
     # CSV file paths (used when data_source="csv")
-    accidents_csv_path: str = "../../police_data.csv"
+    accidents_csv_path: str = "../../accidents_data.csv"
     road_segments_csv_path: str = "../../road_segments.csv"
 
     # ML models directory (relative to working directory or absolute)

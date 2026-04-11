@@ -1,7 +1,5 @@
 ### Base URL variable
 @baseUrl = http://localhost:8000
-@clusterId = 1
-
 
 ### POST /api/clusters/run — run DBSCAN with default params (CSV data source)
 POST {{baseUrl}}/api/clusters/run
