@@ -19,16 +19,25 @@ class ExampleDataLoader:
         if value == "NULL" or value == "":
             return None
 
-        if "time" in column_name.lower() or "date" in column_name.lower():
+        # Check if column contains datetime data
+        datetime_indicators = ["time", "date", "_seen", "_from", "_to", "_at"]
+        is_datetime_column = any(indicator in column_name.lower() for indicator in datetime_indicators)
+
+        if is_datetime_column:
             try:
                 # PostgreSQL exports timestamps with space: "2025-01-12 19:10:00+00"
+                # or with microseconds: "2026-04-10 04:32:28.199697+00"
                 # Replace space with T for ISO format compatibility
-                iso_value = value.replace(" ", "T").replace("+00", "+00:00")
+                iso_value = value.replace(" ", "T")
+                # Fix timezone format: +00 -> +00:00
+                if iso_value.endswith("+00"):
+                    iso_value = iso_value[:-3] + "+00:00"
                 dt = datetime.fromisoformat(iso_value)
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
                 return dt
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Failed to parse datetime '{value}' in column '{column_name}': {e}")
                 return value
 
         if value.lower() == "true":
@@ -156,16 +165,29 @@ class ExampleDataLoader:
             jams = [j for j in jams if j.get("segment_id") in segment_ids]
 
         if date_from or date_to:
+            if date_from and date_from.tzinfo is None:
+                date_from = date_from.replace(tzinfo=timezone.utc)
+            if date_to and date_to.tzinfo is None:
+                date_to = date_to.replace(tzinfo=timezone.utc)
+
             filtered = []
             for jam in jams:
                 event_time = jam.get("event_time")
                 if not event_time:
                     continue
-                if date_from and event_time < date_from:
+
+                if isinstance(event_time, datetime) and event_time.tzinfo is None:
+                    event_time = event_time.replace(tzinfo=timezone.utc)
+
+                try:
+                    if date_from and event_time < date_from:
+                        continue
+                    if date_to and event_time > date_to:
+                        continue
+                    filtered.append(jam)
+                except TypeError:
+                    logger.warning(f"Skipping jam {jam.get('id')} due to datetime comparison error")
                     continue
-                if date_to and event_time > date_to:
-                    continue
-                filtered.append(jam)
             jams = filtered
 
         return jams
@@ -183,20 +205,33 @@ class ExampleDataLoader:
             alerts = [a for a in alerts if a.get("segment_id") in segment_ids]
 
         if date_from or date_to:
+            if date_from and date_from.tzinfo is None:
+                date_from = date_from.replace(tzinfo=timezone.utc)
+            if date_to and date_to.tzinfo is None:
+                date_to = date_to.replace(tzinfo=timezone.utc)
+
             filtered = []
             for alert in alerts:
                 first_seen = alert.get("first_seen")
                 last_seen = alert.get("last_seen")
 
+                if isinstance(first_seen, datetime) and first_seen.tzinfo is None:
+                    first_seen = first_seen.replace(tzinfo=timezone.utc)
+                if isinstance(last_seen, datetime) and last_seen.tzinfo is None:
+                    last_seen = last_seen.replace(tzinfo=timezone.utc)
+
                 if not (first_seen or last_seen):
                     continue
 
-                if date_from and last_seen and last_seen < date_from:
+                try:
+                    if date_from and last_seen and last_seen < date_from:
+                        continue
+                    if date_to and first_seen and first_seen > date_to:
+                        continue
+                    filtered.append(alert)
+                except TypeError:
+                    logger.warning(f"Skipping alert {alert.get('id')} due to datetime comparison error")
                     continue
-                if date_to and first_seen and first_seen > date_to:
-                    continue
-
-                filtered.append(alert)
             alerts = filtered
 
         return alerts

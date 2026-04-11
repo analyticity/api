@@ -6,7 +6,13 @@ from modules.map.schema import (
     SegmentStatistics,
     StreetSegmentsResponse,
     AccidentResponse,
-    AccidentsResponse
+    AccidentsResponse,
+    AlertResponse,
+    AlertsResponse,
+    JamResponse,
+    JamsResponse,
+    RestrictionResponse,
+    RestrictionsResponse
 )
 from core.example_data import ExampleDataLoader
 from core.logging_config import get_logger
@@ -138,4 +144,149 @@ def get_accidents_from_example(
         date_from=date_from,
         date_to=date_to
     )
+
+
+def get_alerts_from_example(
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> AlertsResponse:
+    """Get alerts from example data"""
+
+    alerts_data = ExampleDataLoader.get_alerts(None, date_from, date_to)
+
+    if street_names:
+        alerts_data = [a for a in alerts_data if a.get("street_name") in street_names]
+
+    alerts_response = []
+    for alert in alerts_data:
+        location = alert.get("location_geog")
+        road_number = alert.get("road_number")
+
+        alerts_response.append(
+            AlertResponse(
+                id=alert.get("id"),
+                first_seen=alert.get("first_seen"),
+                last_seen=alert.get("last_seen"),
+                location=location,
+                city=alert.get("city"),
+                street_name=alert.get("street_name"),
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                alert_type=alert.get("alert_type"),
+                alert_subtype=alert.get("alert_subtype"),
+                severity=alert.get("severity"),
+                description=alert.get("description"),
+                active=alert.get("active"),
+                segment_id=alert.get("segment_id")
+            )
+        )
+
+    logger.info(f"Loaded {len(alerts_response)} alerts from example data")
+
+    return AlertsResponse(
+        alerts=alerts_response,
+        total_count=len(alerts_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_jams_from_example(
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> JamsResponse:
+    """Get traffic jams from example data"""
+
+    jams_data = ExampleDataLoader.get_jams(None, date_from, date_to)
+
+    if street_names:
+        jams_data = [j for j in jams_data if j.get("street_name") in street_names]
+
+    jams_response = []
+    for jam in jams_data:
+        jam_line = jam.get("jam_line_geog")
+        road_number = jam.get("road_number")
+
+        jams_response.append(
+            JamResponse(
+                id=jam.get("id"),
+                event_time=jam.get("event_time"),
+                first_seen=jam.get("first_seen"),
+                last_seen=jam.get("last_seen"),
+                jam_line=jam_line,
+                city=jam.get("city"),
+                street_name=jam.get("street_name"),
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                delay_seconds=jam.get("delay_seconds"),
+                length_m=jam.get("length_m"),
+                speed_kmh=jam.get("speed_kmh"),
+                speed_normal_kmh=jam.get("speed_normal_kmh"),
+                severity=jam.get("severity"),
+                segment_id=jam.get("segment_id")
+            )
+        )
+
+    logger.info(f"Loaded {len(jams_response)} jams from example data")
+
+    return JamsResponse(
+        jams=jams_response,
+        total_count=len(jams_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_restrictions_from_example(
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> RestrictionsResponse:
+    """Get restrictions from example data"""
+
+    restrictions_data = ExampleDataLoader.get_restrictions(None, date_from, date_to)
+
+    if street_names:
+        restrictions_data = [r for r in restrictions_data if r.get("street_name") in street_names]
+
+    restrictions_response = []
+    for restriction in restrictions_data:
+        location_point = restriction.get("location_point_geog")
+        location_line = restriction.get("location_line_geog")
+        road_number = restriction.get("road_number")
+
+        restrictions_response.append(
+            RestrictionResponse(
+                id=restriction.get("id"),
+                event_time=restriction.get("event_time"),
+                valid_from=restriction.get("valid_from"),
+                valid_to=restriction.get("valid_to"),
+                first_seen=restriction.get("first_seen"),
+                last_seen=restriction.get("last_seen"),
+                location_point=location_point,
+                location_line=location_line,
+                city=restriction.get("city"),
+                street_name=restriction.get("street_name"),
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                direction=restriction.get("direction"),
+                restriction_type=restriction.get("restriction_type"),
+                restriction_subtype=restriction.get("restriction_subtype"),
+                urgency=restriction.get("urgency"),
+                severity=restriction.get("severity"),
+                status=restriction.get("status"),
+                max_speed_kmh=restriction.get("max_speed_kmh"),
+                description_cs=restriction.get("description_cs"),
+                segment_id=restriction.get("segment_id")
+            )
+        )
+
+    logger.info(f"Loaded {len(restrictions_response)} restrictions from example data")
+
+    return RestrictionsResponse(
+        restrictions=restrictions_response,
+        total_count=len(restrictions_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
 

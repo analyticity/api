@@ -12,6 +12,12 @@ from modules.map.schema import (
     StreetSegmentsResponse,
     AccidentResponse,
     AccidentsResponse,
+    AlertResponse,
+    AlertsResponse,
+    JamResponse,
+    JamsResponse,
+    RestrictionResponse,
+    RestrictionsResponse,
     Polyline
 )
 from core.logging_config import get_logger
@@ -187,4 +193,188 @@ def get_accidents_from_db(
         date_from=date_from,
         date_to=date_to
     )
+
+
+def get_alerts_from_db(
+    db: Session,
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> AlertsResponse:
+    """Get alerts for given streets and date range from database"""
+
+    query = db.query(Alert).filter(
+        or_(
+            and_(Alert.first_seen >= date_from, Alert.first_seen <= date_to),
+            and_(Alert.last_seen >= date_from, Alert.last_seen <= date_to),
+            and_(Alert.first_seen <= date_from, Alert.last_seen >= date_to)
+        )
+    )
+
+    if street_names:
+        query = query.filter(Alert.street_name.in_(street_names))
+
+    alerts_query = query.all()
+
+    alerts_response = []
+    for alert in alerts_query:
+        location = None
+        if alert.location_geog:
+            location_json = db.scalar(ST_AsGeoJSON(alert.location_geog))
+            location = parse_geojson_to_coordinates(location_json)
+
+        road_number = alert.road_number
+        alerts_response.append(
+            AlertResponse(
+                id=alert.id,
+                first_seen=alert.first_seen,
+                last_seen=alert.last_seen,
+                location=location,
+                city=alert.city,
+                street_name=alert.street_name,
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                alert_type=alert.alert_type,
+                alert_subtype=alert.alert_subtype,
+                severity=alert.severity,
+                description=alert.description,
+                active=alert.active,
+                segment_id=alert.segment_id
+            )
+        )
+
+    logger.info(f"Loaded {len(alerts_response)} alerts from database")
+
+    return AlertsResponse(
+        alerts=alerts_response,
+        total_count=len(alerts_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_jams_from_db(
+    db: Session,
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> JamsResponse:
+    """Get traffic jams for given streets and date range from database"""
+
+    query = db.query(TrafficJam).filter(
+        TrafficJam.event_time >= date_from,
+        TrafficJam.event_time <= date_to
+    )
+
+    if street_names:
+        query = query.filter(TrafficJam.street_name.in_(street_names))
+
+    jams_query = query.all()
+
+    jams_response = []
+    for jam in jams_query:
+        jam_line = None
+        if jam.jam_line_geog:
+            jam_line_json = db.scalar(ST_AsGeoJSON(jam.jam_line_geog))
+            jam_line = parse_geojson_to_coordinates(jam_line_json)
+
+        road_number = jam.road_number
+        jams_response.append(
+            JamResponse(
+                id=jam.id,
+                event_time=jam.event_time,
+                first_seen=jam.first_seen,
+                last_seen=jam.last_seen,
+                jam_line=jam_line,
+                city=jam.city,
+                street_name=jam.street_name,
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                delay_seconds=jam.delay_seconds,
+                length_m=jam.length_m,
+                speed_kmh=jam.speed_kmh,
+                speed_normal_kmh=jam.speed_normal_kmh,
+                severity=jam.severity,
+                segment_id=jam.segment_id
+            )
+        )
+
+    logger.info(f"Loaded {len(jams_response)} jams from database")
+
+    return JamsResponse(
+        jams=jams_response,
+        total_count=len(jams_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_restrictions_from_db(
+    db: Session,
+    street_names: List[str],
+    date_from: datetime,
+    date_to: datetime
+) -> RestrictionsResponse:
+    """Get restrictions for given streets and date range from database"""
+
+    query = db.query(Restriction).filter(
+        or_(
+            and_(Restriction.valid_from >= date_from, Restriction.valid_from <= date_to),
+            and_(Restriction.valid_to >= date_from, Restriction.valid_to <= date_to),
+            and_(Restriction.valid_from <= date_from, Restriction.valid_to >= date_to),
+            and_(Restriction.valid_from.is_(None), Restriction.valid_to.is_(None))
+        )
+    )
+
+    if street_names:
+        query = query.filter(Restriction.street_name.in_(street_names))
+
+    restrictions_query = query.all()
+
+    restrictions_response = []
+    for restriction in restrictions_query:
+        location_point = None
+        location_line = None
+
+        if restriction.location_point_geog:
+            point_json = db.scalar(ST_AsGeoJSON(restriction.location_point_geog))
+            location_point = parse_geojson_to_coordinates(point_json)
+
+        if restriction.location_line_geog:
+            line_json = db.scalar(ST_AsGeoJSON(restriction.location_line_geog))
+            location_line = parse_geojson_to_coordinates(line_json)
+
+        road_number = restriction.road_number
+        restrictions_response.append(
+            RestrictionResponse(
+                id=restriction.id,
+                event_time=restriction.event_time,
+                valid_from=restriction.valid_from,
+                valid_to=restriction.valid_to,
+                first_seen=restriction.first_seen,
+                last_seen=restriction.last_seen,
+                location_point=location_point,
+                location_line=location_line,
+                city=restriction.city,
+                street_name=restriction.street_name,
+                road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                direction=restriction.direction,
+                restriction_type=restriction.restriction_type,
+                restriction_subtype=restriction.restriction_subtype,
+                urgency=restriction.urgency,
+                severity=restriction.severity,
+                status=restriction.status,
+                max_speed_kmh=restriction.max_speed_kmh,
+                description_cs=restriction.description_cs,
+                segment_id=restriction.segment_id
+            )
+        )
+
+    logger.info(f"Loaded {len(restrictions_response)} restrictions from database")
+
+    return RestrictionsResponse(
+        restrictions=restrictions_response,
+        total_count=len(restrictions_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
 
