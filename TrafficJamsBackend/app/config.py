@@ -7,6 +7,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",  # silently ignore PORT, WORKERS and other shell-only vars
     )
 
     # Database
@@ -29,6 +30,12 @@ class Settings(BaseSettings):
 
     # ML models directory (relative to working directory or absolute)
     models_dir: str = "models"
+
+    # Auto-clustering on startup (postgres mode only)
+    # When true: if dangerous_road_clusters is empty at boot, clustering runs automatically
+    # using dbscan_eps_meters and dbscan_min_samples values below.
+    # Keep false in production unless you want clustering on every cold start.
+    auto_cluster_on_startup: bool = False
 
     # App
     app_title: str = "Accidents API"
