@@ -1,0 +1,58 @@
+### Base URL variable
+@baseUrl = http://localhost:8000
+@clusterId = 1
+
+
+### GET /api/prediction/clusters/{id} — fully automatic (weather + temporal from server)
+# Weather is fetched from Open-Meteo using the cluster centroid.
+# Temporal features (hour, is_night, is_weekend …) are derived from the server clock.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}
+
+###
+
+### GET /api/prediction/clusters/{id} — override weather condition only
+# Road surface and road condition are derived from the provided weather.
+# Temporal features are still taken from the server clock.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=rain
+
+###
+
+### GET /api/prediction/clusters/{id} — override all weather conditions (skips Open-Meteo)
+# When weather_condition is provided, Open-Meteo is not called.
+# light_condition is still derived from the server clock if omitted.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=snow&road_surface=ice&road_condition=slippery
+
+###
+
+### GET /api/prediction/clusters/{id} — specify full conditions including light
+# All weather fields provided → fully user-controlled, no external API call.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=fog&road_surface=wet&light_condition=dark&road_condition=reduced_visibility
+
+###
+
+### GET /api/prediction/clusters/{id} — add accident type and cause hints
+# accident_type and cause_primary are optional model hints.
+# They default to "unknown" when omitted.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=clear&road_surface=dry&accident_type=collision&cause_primary=speed
+
+###
+
+### GET /api/prediction/clusters/{id} — clear summer day scenario
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=clear&road_surface=dry&light_condition=daylight&road_condition=normal
+
+###
+
+### GET /api/prediction/clusters/{id} — worst-case winter night scenario
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}?weather_condition=snow&road_surface=ice&light_condition=dark&road_condition=slippery
+
+###
+
+### GET /api/prediction/clusters/{id} — 404 cluster not found
+GET {{baseUrl}}/api/prediction/clusters/99999
+
+###
+
+### GET /api/prediction/clusters/{id} — 503 models not loaded
+# Returned when scripts/train_model.py has not been run yet (no .joblib files in models/).
+# Example only — expects 503 if models directory is empty.
+GET {{baseUrl}}/api/prediction/clusters/{{clusterId}}

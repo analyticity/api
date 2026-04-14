@@ -1,0 +1,60 @@
+# Local development only — NOT used on the production server.
+# Spins up a PostGIS database alongside the API so you can develop
+# against a real Postgres instance without installing it locally.
+#
+# Usage:
+#   docker compose up --build          # start everything
+#   docker compose up db               # start only the database
+#   docker compose down -v             # stop and remove volumes
+
+services:
+
+  # ── PostGIS database ─────────────────────────────────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: accidents_db
+    environment:
+      POSTGRES_DB: accidents_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"           # expose to host so you can connect with psql / DBeaver
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d accidents_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── API ───────────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: accidents_api
+    ports:
+      - "8000:8000"
+    # Load base config from .env, then override the values that must point
+    # to the compose network (db host) or container-internal paths.
+    env_file: .env
+    environment:
+      DATA_SOURCE: postgres
+      DATABASE_URL: postgresql+asyncpg://postgres:password@db:5432/accidents_db
+      DATABASE_URL_SYNC: postgresql+psycopg2://postgres:password@db:5432/accidents_db
+      # Inside the container the CSV files are mounted at /app/data/
+      ACCIDENTS_CSV_PATH: /app/data/accidents_data.csv
+      ROAD_SEGMENTS_CSV_PATH: /app/data/road_segments.csv
+      MODELS_DIR: /app/models
+      WORKERS: "1"
+    volumes:
+      # Trained model weights — mount so retraining survives container restarts
+      - ./models:/app/models
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
