@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from api.api_v1 import api_router
 from core.logging_config import setup_logging, get_logger
 from core.middleware import LoggingMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from db.connection_to_db import is_database_available
 
 setup_logging(log_level="INFO")
@@ -28,6 +29,14 @@ app = FastAPI(
 )
 
 app.add_middleware(LoggingMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 app.include_router(api_router, prefix="/api/v1")
 
