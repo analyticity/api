@@ -2,33 +2,10 @@ version: '3.8'
 
 services:
   api:
-    image: ghcr.io/TVUJ_USERNAME/TVUJ_REPO:latest
+    image: ghcr.io/analyticity/api:latest
     container_name: analyticity-api
     ports:
       - "8000:8000"
-    environment:
-      POSTGRES_HOST_BRNO: db
-      POSTGRES_PORT_BRNO: 5432
-      POSTGRES_DB_BRNO: analyticity
-      POSTGRES_USER_BRNO: postgres
-      POSTGRES_PASSWORD_BRNO: postgres
-    depends_on:
-      - db
+    env_file:
+      - .env
     restart: unless-stopped
-
-  db:
-    image: timescale/timescaledb-ha:pg16
-    container_name: analyticity-db
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: analyticity
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/home/postgres/pgdata/data
-    restart: unless-stopped
-    command: postgres -c shared_preload_libraries=timescaledb
-
-volumes:
-  postgres_data:
