@@ -1,7 +1,3 @@
-# IDE
-.idea/
-.vscode/
-
 # Python
 __pycache__/
 *.py[cod]
@@ -20,32 +16,43 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
-# Virtual Environment
+# Virtual environments
 venv/
+.venv/
 ENV/
 env/
-.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # Environment variables
 .env
 .env.local
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Docker
+.dockerignore
+
+# AdminBackend (legacy)
+AdminBackend/
 

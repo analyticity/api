@@ -1,0 +1,190 @@
+"table_name","column_name","data_type","is_nullable","character_maximum_length"
+"accidents","id","bigint","NO",NULL
+"accidents","external_ids","jsonb","NO",NULL
+"accidents","event_time","timestamp with time zone","YES",NULL
+"accidents","ingested_at","timestamp with time zone","NO",NULL
+"accidents","first_seen","timestamp with time zone","YES",NULL
+"accidents","last_seen","timestamp with time zone","YES",NULL
+"accidents","location_geog","USER-DEFINED","YES",NULL
+"accidents","city","text","YES",NULL
+"accidents","street_name","text","YES",NULL
+"accidents","road_number","text","YES",NULL
+"accidents","road_type_code","text","YES",NULL
+"accidents","accident_type","text","YES",NULL
+"accidents","accident_subtype","text","YES",NULL
+"accidents","cause_primary","text","YES",NULL
+"accidents","cause_secondary","text","YES",NULL
+"accidents","severity","text","YES",NULL
+"accidents","fatalities_count","integer","YES",NULL
+"accidents","serious_injuries","integer","YES",NULL
+"accidents","minor_injuries","integer","YES",NULL
+"accidents","persons_involved","integer","YES",NULL
+"accidents","vehicles_involved","integer","YES",NULL
+"accidents","damage_czk","integer","YES",NULL
+"accidents","damage_category","text","YES",NULL
+"accidents","weather_condition","text","YES",NULL
+"accidents","road_surface","text","YES",NULL
+"accidents","light_condition","text","YES",NULL
+"accidents","road_condition","text","YES",NULL
+"accidents","vehicle_types","ARRAY","YES",NULL
+"accidents","alcohol_involved","boolean","YES",NULL
+"accidents","drugs_involved","boolean","YES",NULL
+"accidents","alcohol_level","double precision","YES",NULL
+"accidents","quality_score","integer","YES",NULL
+"accidents","raw","jsonb","NO",NULL
+"accidents","segment_id","bigint","YES",NULL
+"alerts","id","bigint","NO",NULL
+"alerts","external_ids","jsonb","NO",NULL
+"alerts","ingested_at","timestamp with time zone","NO",NULL
+"alerts","first_seen","timestamp with time zone","YES",NULL
+"alerts","last_seen","timestamp with time zone","YES",NULL
+"alerts","location_geog","USER-DEFINED","YES",NULL
+"alerts","city","text","YES",NULL
+"alerts","street_name","text","YES",NULL
+"alerts","road_number","text","YES",NULL
+"alerts","road_type_code","text","YES",NULL
+"alerts","alert_type","text","YES",NULL
+"alerts","alert_subtype","text","YES",NULL
+"alerts","severity","text","YES",NULL
+"alerts","description","text","YES",NULL
+"alerts","quality_score","integer","YES",NULL
+"alerts","active","boolean","YES",NULL
+"alerts","raw","jsonb","NO",NULL
+"alerts","segment_id","bigint","YES",NULL
+"event_links","id","bigint","NO",NULL
+"event_links","source_type","text","NO",NULL
+"event_links","source_id","bigint","NO",NULL
+"event_links","target_type","text","NO",NULL
+"event_links","target_id","bigint","NO",NULL
+"event_links","link_type","text","NO",NULL
+"event_links","confidence","integer","YES",NULL
+"event_links","description","text","YES",NULL
+"event_links","created_at","timestamp with time zone","YES",NULL
+"flyway_schema_history","installed_rank","integer","NO",NULL
+"flyway_schema_history","version","character varying","YES",50
+"flyway_schema_history","description","character varying","NO",200
+"flyway_schema_history","type","character varying","NO",20
+"flyway_schema_history","script","character varying","NO",1000
+"flyway_schema_history","checksum","integer","YES",NULL
+"flyway_schema_history","installed_by","character varying","NO",100
+"flyway_schema_history","installed_on","timestamp without time zone","NO",NULL
+"flyway_schema_history","execution_time","integer","NO",NULL
+"flyway_schema_history","success","boolean","NO",NULL
+"flyway_schema_history_police_accidents","installed_rank","integer","NO",NULL
+"flyway_schema_history_police_accidents","version","character varying","YES",50
+"flyway_schema_history_police_accidents","description","character varying","NO",200
+"flyway_schema_history_police_accidents","type","character varying","NO",20
+"flyway_schema_history_police_accidents","script","character varying","NO",1000
+"flyway_schema_history_police_accidents","checksum","integer","YES",NULL
+"flyway_schema_history_police_accidents","installed_by","character varying","NO",100
+"flyway_schema_history_police_accidents","installed_on","timestamp without time zone","NO",NULL
+"flyway_schema_history_police_accidents","execution_time","integer","NO",NULL
+"flyway_schema_history_police_accidents","success","boolean","NO",NULL
+"flyway_seed_history","installed_rank","integer","NO",NULL
+"flyway_seed_history","version","character varying","YES",50
+"flyway_seed_history","description","character varying","NO",200
+"flyway_seed_history","type","character varying","NO",20
+"flyway_seed_history","script","character varying","NO",1000
+"flyway_seed_history","checksum","integer","YES",NULL
+"flyway_seed_history","installed_by","character varying","NO",100
+"flyway_seed_history","installed_on","timestamp without time zone","NO",NULL
+"flyway_seed_history","execution_time","integer","NO",NULL
+"flyway_seed_history","success","boolean","NO",NULL
+"geography_columns","f_table_catalog","name","YES",NULL
+"geography_columns","f_table_schema","name","YES",NULL
+"geography_columns","f_table_name","name","YES",NULL
+"geography_columns","f_geography_column","name","YES",NULL
+"geography_columns","coord_dimension","integer","YES",NULL
+"geography_columns","srid","integer","YES",NULL
+"geography_columns","type","text","YES",NULL
+"geometry_columns","f_table_catalog","character varying","YES",256
+"geometry_columns","f_table_schema","name","YES",NULL
+"geometry_columns","f_table_name","name","YES",NULL
+"geometry_columns","f_geometry_column","name","YES",NULL
+"geometry_columns","coord_dimension","integer","YES",NULL
+"geometry_columns","srid","integer","YES",NULL
+"geometry_columns","type","character varying","YES",30
+"police_ingest_checkpoint","region_code","character varying","NO",16
+"police_ingest_checkpoint","data_year","integer","NO",NULL
+"police_ingest_checkpoint","completed_at","timestamp without time zone","NO",NULL
+"police_ingest_checkpoint","record_count","integer","YES",NULL
+"police_ingest_checkpoint","source_url","character varying","YES",2048
+"providers","id","bigint","NO",NULL
+"providers","provider_key","text","NO",NULL
+"providers","name","text","YES",NULL
+"providers","description","text","YES",NULL
+"providers","homepage_url","text","YES",NULL
+"providers","api_url","text","YES",NULL
+"providers","data_format","text","YES",NULL
+"providers","active","boolean","YES",NULL
+"providers","created_at","timestamp with time zone","YES",NULL
+"providers","updated_at","timestamp with time zone","YES",NULL
+"restrictions","id","bigint","NO",NULL
+"restrictions","external_ids","jsonb","NO",NULL
+"restrictions","external_version","integer","YES",NULL
+"restrictions","event_time","timestamp with time zone","YES",NULL
+"restrictions","ingested_at","timestamp with time zone","NO",NULL
+"restrictions","valid_from","timestamp with time zone","YES",NULL
+"restrictions","valid_to","timestamp with time zone","YES",NULL
+"restrictions","first_seen","timestamp with time zone","YES",NULL
+"restrictions","last_seen","timestamp with time zone","YES",NULL
+"restrictions","location_point_geog","USER-DEFINED","YES",NULL
+"restrictions","location_line_geog","USER-DEFINED","YES",NULL
+"restrictions","city","text","YES",NULL
+"restrictions","street_name","text","YES",NULL
+"restrictions","road_number","text","YES",NULL
+"restrictions","road_type_code","text","YES",NULL
+"restrictions","km_from","double precision","YES",NULL
+"restrictions","km_to","double precision","YES",NULL
+"restrictions","direction","text","YES",NULL
+"restrictions","restriction_type","text","YES",NULL
+"restrictions","restriction_subtype","text","YES",NULL
+"restrictions","urgency","text","YES",NULL
+"restrictions","probability","text","YES",NULL
+"restrictions","severity","text","YES",NULL
+"restrictions","status","text","YES",NULL
+"restrictions","max_speed_kmh","integer","YES",NULL
+"restrictions","description_cs","text","YES",NULL
+"restrictions","quality_score","integer","YES",NULL
+"restrictions","raw","jsonb","NO",NULL
+"restrictions","segment_id","bigint","YES",NULL
+"road_segments","id","bigint","NO",NULL
+"road_segments","osm_id","bigint","YES",NULL
+"road_segments","geog","USER-DEFINED","NO",NULL
+"road_segments","name","text","YES",NULL
+"road_segments","road_ref","text","YES",NULL
+"road_segments","road_class","text","NO",NULL
+"road_segments","city","text","YES",NULL
+"road_segments","max_speed","integer","YES",NULL
+"road_types","id","integer","NO",NULL
+"road_types","code","text","NO",NULL
+"road_types","name","text","YES",NULL
+"road_types","description","text","YES",NULL
+"road_types","waze_code","integer","YES",NULL
+"road_types","police_code","text","YES",NULL
+"road_types","ndic_code","text","YES",NULL
+"road_types","created_at","timestamp with time zone","YES",NULL
+"spatial_ref_sys","srid","integer","NO",NULL
+"spatial_ref_sys","auth_name","character varying","YES",256
+"spatial_ref_sys","auth_srid","integer","YES",NULL
+"spatial_ref_sys","srtext","character varying","YES",2048
+"spatial_ref_sys","proj4text","character varying","YES",2048
+"traffic_jams","id","bigint","NO",NULL
+"traffic_jams","external_ids","jsonb","NO",NULL
+"traffic_jams","event_time","timestamp with time zone","YES",NULL
+"traffic_jams","ingested_at","timestamp with time zone","NO",NULL
+"traffic_jams","first_seen","timestamp with time zone","YES",NULL
+"traffic_jams","last_seen","timestamp with time zone","YES",NULL
+"traffic_jams","jam_line_geog","USER-DEFINED","YES",NULL
+"traffic_jams","city","text","YES",NULL
+"traffic_jams","street_name","text","YES",NULL
+"traffic_jams","road_number","text","YES",NULL
+"traffic_jams","road_type_code","text","YES",NULL
+"traffic_jams","delay_seconds","double precision","YES",NULL
+"traffic_jams","length_m","double precision","YES",NULL
+"traffic_jams","speed_kmh","double precision","YES",NULL
+"traffic_jams","speed_normal_kmh","double precision","YES",NULL
+"traffic_jams","severity","text","YES",NULL
+"traffic_jams","quality_score","integer","YES",NULL
+"traffic_jams","raw","jsonb","NO",NULL
+"traffic_jams","segment_id","bigint","YES",NULL
