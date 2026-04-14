@@ -5,6 +5,7 @@ from core.middleware import LoggingMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from db.connection_to_db import is_database_available
 from dotenv import load_dotenv
+import os
 
 setup_logging(log_level="INFO")
 logger = get_logger(__name__)
