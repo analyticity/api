@@ -1,0 +1,53 @@
+### Base URL variable
+@baseUrl = http://localhost:8000
+
+### POST /api/clusters/run — run DBSCAN with default params (CSV data source)
+POST {{baseUrl}}/api/clusters/run
+Content-Type: application/json
+
+{
+  "eps_meters": 100.0,
+  "min_samples": 3,
+  "replace_existing": false
+}
+
+###
+
+### POST /api/clusters/run — run with date filter
+POST {{baseUrl}}/api/clusters/run
+Content-Type: application/json
+
+{
+  "eps_meters": 150.0,
+  "min_samples": 2,
+  "date_from": "2025-01-01",
+  "date_to": "2025-12-31",
+  "replace_existing": true
+}
+
+###
+
+### POST /api/clusters/run — replace existing clusters for same params
+POST {{baseUrl}}/api/clusters/run
+Content-Type: application/json
+
+{
+  "eps_meters": 100.0,
+  "min_samples": 3,
+  "replace_existing": true
+}
+
+###
+
+### GET /api/clusters — list all clusters
+GET {{baseUrl}}/api/clusters
+
+###
+
+### GET /api/clusters/{id} — get cluster detail
+GET {{baseUrl}}/api/clusters/{{clusterId}}
+
+###
+
+### GET /api/clusters/{id}/accidents — list accidents in cluster (paginated)
+GET {{baseUrl}}/api/clusters/{{clusterId}}/accidents?page=1&page_size=50

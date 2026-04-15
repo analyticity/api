@@ -1,0 +1,33 @@
+# Python runtime artefacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+.Python
+
+# Virtual environment (dependencies are installed inside the container by uv)
+.venv/
+
+# Local environment file
+.env
+
+# Test files are not needed at runtime
+tests/
+
+# OSMnx / script cache
+cache/
+
+# CSV data files — excluded everywhere except the data/ directory which is baked in
+*.csv
+!data/
+
+# Editor and OS metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Git
+.git/
+.gitignore

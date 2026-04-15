@@ -1,0 +1,8 @@
+### Base URL variable
+@baseUrl = http://localhost:8000
+
+### GET / — service info
+GET {{baseUrl}}/
+
+### GET /health — health check
+GET {{baseUrl}}/health
