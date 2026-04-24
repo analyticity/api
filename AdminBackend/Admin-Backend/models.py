@@ -63,6 +63,7 @@ class Show(Base):
 class Settings(Base):
     __tablename__ = "settings"
     id = Column(Integer, primary_key=True, index=True)
+    varname = Column(String, nullable=False)
     settingname = Column(String, nullable=False)
     setting = Column(String, nullable=False)
     town = Column(Integer, nullable=True)
