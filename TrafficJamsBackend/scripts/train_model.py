@@ -152,7 +152,7 @@ def run_dbscan(df: pd.DataFrame, eps_meters: float, min_samples: int) -> np.ndar
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Derive all model features in-place on a copy of df."""
     df = df.copy()
-    dt = pd.to_datetime(df["event_time"], utc=True, errors="coerce")
+    dt = pd.to_datetime(df["first_seen"], utc=True, errors="coerce")
     df["hour"]           = dt.dt.hour
     df["day_of_week"]    = dt.dt.dayofweek           # 0 = Mon, 6 = Sun
     df["month"]          = dt.dt.month
@@ -307,8 +307,8 @@ def tune_regressor(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train classifier + regressor with GridSearchCV tuning")
     parser.add_argument("--accidents-csv", type=Path, default=DEFAULT_ACCIDENTS_CSV)
-    parser.add_argument("--eps", type=float, default=100.0,
-                        help="DBSCAN eps radius in metres (default: 100)")
+    parser.add_argument("--eps", type=float, default=30.0,
+                        help="DBSCAN eps radius in metres (default: 30)")
     parser.add_argument("--min-samples", type=int, default=3,
                         help="DBSCAN min_samples to form a cluster (default: 3)")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -345,9 +345,9 @@ def main() -> None:
     df = engineer_features(df)
 
     # ── 3. Time-based train / test split ─────────────────────────────────────
-    # Sort by event_time — test set is always the most recent data.
+    # Sort by first_seen — test set is always the most recent data.
     # Random splits would leak future information into the training fold.
-    df = df.sort_values("event_time").reset_index(drop=True)
+    df = df.sort_values("first_seen").reset_index(drop=True)
     split_idx = int(len(df) * args.train_ratio)
     train_df, test_df = df.iloc[:split_idx], df.iloc[split_idx:]
     log.info("Split: %d train / %d test rows", len(train_df), len(test_df))

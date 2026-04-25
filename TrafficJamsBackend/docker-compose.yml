@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
     container_name: accidents_api
     ports:
-      - "8000:8000"
+      - "8002:8000"
     # Load base config from .env, then override the values that must point
     # to the compose network (db host) or container-internal paths.
     env_file: .env

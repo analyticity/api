@@ -165,7 +165,7 @@ class ClusterDetail(ClusterBase):
 # ─── Clustering run request/response ───────────────────────────────────────────
 
 class ClusterRunRequest(BaseModel):
-    eps_meters: float = 100.0
+    eps_meters: float = 30.0
     min_samples: int = 3
     # Optional filters for accidents to cluster
     region: Optional[int] = None
