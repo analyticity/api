@@ -210,12 +210,18 @@ def get_accidents_from_db(
             AccidentResponse(
                 id=accident.id,
                 event_time=accident.event_time,
+                ingested_at=accident.ingested_at,
+                first_seen=accident.first_seen,
+                last_seen=accident.last_seen,
                 location=location,
                 city=accident.city,
                 street_name=accident.street_name,
                 road_number=accident.road_number,
+                road_type_code=accident.road_type_code,
                 accident_type=accident.accident_type,
                 accident_subtype=accident.accident_subtype,
+                cause_primary=accident.cause_primary,
+                cause_secondary=accident.cause_secondary,
                 severity=accident.severity,
                 fatalities_count=accident.fatalities_count,
                 serious_injuries=accident.serious_injuries,
@@ -223,11 +229,16 @@ def get_accidents_from_db(
                 persons_involved=accident.persons_involved,
                 vehicles_involved=accident.vehicles_involved,
                 damage_czk=accident.damage_czk,
+                damage_category=accident.damage_category,
                 weather_condition=accident.weather_condition,
                 road_surface=accident.road_surface,
                 light_condition=accident.light_condition,
+                road_condition=accident.road_condition,
+                vehicle_types=accident.vehicle_types,
                 alcohol_involved=accident.alcohol_involved,
                 drugs_involved=accident.drugs_involved,
+                alcohol_level=accident.alcohol_level,
+                quality_score=accident.quality_score,
                 segment_id=accident.segment_id
             )
         )
@@ -274,17 +285,20 @@ def get_alerts_from_db(
         alerts_response.append(
             AlertResponse(
                 id=alert.id,
+                ingested_at=alert.ingested_at,
                 first_seen=alert.first_seen,
                 last_seen=alert.last_seen,
                 location=location,
                 city=alert.city,
                 street_name=alert.street_name,
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=alert.road_type_code,
                 alert_type=alert.alert_type,
                 alert_subtype=alert.alert_subtype,
                 severity=alert.severity,
                 description=alert.description,
                 active=alert.active,
+                quality_score=alert.quality_score,
                 segment_id=alert.segment_id
             )
         )
@@ -329,17 +343,20 @@ def get_jams_from_db(
             JamResponse(
                 id=jam.id,
                 event_time=jam.event_time,
+                ingested_at=jam.ingested_at,
                 first_seen=jam.first_seen,
                 last_seen=jam.last_seen,
                 jam_line=jam_line,
                 city=jam.city,
                 street_name=jam.street_name,
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=jam.road_type_code,
                 delay_seconds=jam.delay_seconds,
                 length_m=jam.length_m,
                 speed_kmh=jam.speed_kmh,
                 speed_normal_kmh=jam.speed_normal_kmh,
                 severity=jam.severity,
+                quality_score=jam.quality_score,
                 segment_id=jam.segment_id
             )
         )
@@ -393,7 +410,9 @@ def get_restrictions_from_db(
         restrictions_response.append(
             RestrictionResponse(
                 id=restriction.id,
+                external_version=restriction.external_version,
                 event_time=restriction.event_time,
+                ingested_at=restriction.ingested_at,
                 valid_from=restriction.valid_from,
                 valid_to=restriction.valid_to,
                 first_seen=restriction.first_seen,
@@ -403,14 +422,19 @@ def get_restrictions_from_db(
                 city=restriction.city,
                 street_name=restriction.street_name,
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=restriction.road_type_code,
+                km_from=restriction.km_from,
+                km_to=restriction.km_to,
                 direction=restriction.direction,
                 restriction_type=restriction.restriction_type,
                 restriction_subtype=restriction.restriction_subtype,
                 urgency=restriction.urgency,
+                probability=restriction.probability,
                 severity=restriction.severity,
                 status=restriction.status,
                 max_speed_kmh=restriction.max_speed_kmh,
                 description_cs=restriction.description_cs,
+                quality_score=restriction.quality_score,
                 segment_id=restriction.segment_id
             )
         )

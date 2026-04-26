@@ -58,6 +58,7 @@ class Accident(Base):
     road_surface = Column(Text)
     light_condition = Column(Text)
     road_condition = Column(Text)
+    vehicle_types = Column(Text)
     alcohol_involved = Column(Boolean)
     drugs_involved = Column(Boolean)
     alcohol_level = Column(Float)
