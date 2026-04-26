@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Images
 
 on:
   push:
@@ -14,6 +14,19 @@ jobs:
       contents: read
       packages: write
 
+    strategy:
+      matrix:
+        include:
+          - name: api
+            context: .
+            dockerfile: Dockerfile
+          - name: admin-backend
+            context: AdminBackend
+            dockerfile: AdminBackend/Dockerfile
+          - name: traffic-jams-backend
+            context: TrafficJamsBackend
+            dockerfile: TrafficJamsBackend/Dockerfile
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,23 +34,26 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Extract metadata
+      - name: Set image name
         id: meta
         run: |
-          IMAGE=ghcr.io/${{ github.repository }}
+          IMAGE=ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
       - name: Build image
-        run: docker build -t ${{ steps.meta.outputs.image }}:latest .
+        run: |
+          docker build \
+            -f ${{ matrix.dockerfile }} \
+            -t ${{ steps.meta.outputs.image }}:latest \
+            ${{ matrix.context }}
 
       - name: Tag version (if tag exists)
         if: startsWith(github.ref, 'refs/tags/')
-        run: docker tag ${{ steps.meta.outputs.image }}:latest ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+        run: docker tag ${{ steps.meta.outputs.image }}:latest ${{ steps.meta.outputs.image }}:${{ github.ref_name }}
 
       - name: Push image
         run: |
           docker push ${{ steps.meta.outputs.image }}:latest
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            docker push ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            docker push ${{ steps.meta.outputs.image }}:${{ github.ref_name }}
           fi
