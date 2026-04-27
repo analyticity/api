@@ -161,12 +161,18 @@ def get_accidents_from_example(
             AccidentResponse(
                 id=accident.get("id"),
                 event_time=accident.get("event_time"),
+                ingested_at=accident.get("ingested_at"),
+                first_seen=accident.get("first_seen"),
+                last_seen=accident.get("last_seen"),
                 location=location,
                 city=accident.get("city"),
                 street_name=accident.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=accident.get("road_type_code"),
                 accident_type=accident.get("accident_type"),
                 accident_subtype=accident.get("accident_subtype"),
+                cause_primary=accident.get("cause_primary"),
+                cause_secondary=accident.get("cause_secondary"),
                 severity=accident.get("severity"),
                 fatalities_count=accident.get("fatalities_count"),
                 serious_injuries=accident.get("serious_injuries"),
@@ -174,11 +180,16 @@ def get_accidents_from_example(
                 persons_involved=accident.get("persons_involved"),
                 vehicles_involved=accident.get("vehicles_involved"),
                 damage_czk=accident.get("damage_czk"),
+                damage_category=accident.get("damage_category"),
                 weather_condition=accident.get("weather_condition"),
                 road_surface=accident.get("road_surface"),
                 light_condition=accident.get("light_condition"),
+                road_condition=accident.get("road_condition"),
+                vehicle_types=accident.get("vehicle_types"),
                 alcohol_involved=accident.get("alcohol_involved"),
                 drugs_involved=accident.get("drugs_involved"),
+                alcohol_level=accident.get("alcohol_level"),
+                quality_score=accident.get("quality_score"),
                 segment_id=accident.get("segment_id")
             )
         )
@@ -213,17 +224,20 @@ def get_alerts_from_example(
         alerts_response.append(
             AlertResponse(
                 id=alert.get("id"),
+                ingested_at=alert.get("ingested_at"),
                 first_seen=alert.get("first_seen"),
                 last_seen=alert.get("last_seen"),
                 location=location,
                 city=alert.get("city"),
                 street_name=alert.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=alert.get("road_type_code"),
                 alert_type=alert.get("alert_type"),
                 alert_subtype=alert.get("alert_subtype"),
                 severity=alert.get("severity"),
                 description=alert.get("description"),
                 active=alert.get("active"),
+                quality_score=alert.get("quality_score"),
                 segment_id=alert.get("segment_id")
             )
         )
@@ -259,17 +273,20 @@ def get_jams_from_example(
             JamResponse(
                 id=jam.get("id"),
                 event_time=jam.get("event_time"),
+                ingested_at=jam.get("ingested_at"),
                 first_seen=jam.get("first_seen"),
                 last_seen=jam.get("last_seen"),
                 jam_line=jam_line,
                 city=jam.get("city"),
                 street_name=jam.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=jam.get("road_type_code"),
                 delay_seconds=jam.get("delay_seconds"),
                 length_m=jam.get("length_m"),
                 speed_kmh=jam.get("speed_kmh"),
                 speed_normal_kmh=jam.get("speed_normal_kmh"),
                 severity=jam.get("severity"),
+                quality_score=jam.get("quality_score"),
                 segment_id=jam.get("segment_id")
             )
         )
@@ -305,7 +322,9 @@ def get_restrictions_from_example(
         restrictions_response.append(
             RestrictionResponse(
                 id=restriction.get("id"),
+                external_version=restriction.get("external_version"),
                 event_time=restriction.get("event_time"),
+                ingested_at=restriction.get("ingested_at"),
                 valid_from=restriction.get("valid_from"),
                 valid_to=restriction.get("valid_to"),
                 first_seen=restriction.get("first_seen"),
@@ -315,14 +334,19 @@ def get_restrictions_from_example(
                 city=restriction.get("city"),
                 street_name=restriction.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=restriction.get("road_type_code"),
+                km_from=restriction.get("km_from"),
+                km_to=restriction.get("km_to"),
                 direction=restriction.get("direction"),
                 restriction_type=restriction.get("restriction_type"),
                 restriction_subtype=restriction.get("restriction_subtype"),
                 urgency=restriction.get("urgency"),
+                probability=restriction.get("probability"),
                 severity=restriction.get("severity"),
                 status=restriction.get("status"),
                 max_speed_kmh=restriction.get("max_speed_kmh"),
                 description_cs=restriction.get("description_cs"),
+                quality_score=restriction.get("quality_score"),
                 segment_id=restriction.get("segment_id")
             )
         )

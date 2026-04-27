@@ -100,12 +100,18 @@ class AccidentsRequest(BaseModel):
 class AccidentResponse(BaseModel):
     id: int
     event_time: Optional[datetime] = None
+    ingested_at: Optional[datetime] = None
+    first_seen: Optional[datetime] = None
+    last_seen: Optional[datetime] = None
     location: Optional[Polyline] = None
     city: Optional[str] = None
     street_name: Optional[str] = None
     road_number: Optional[str] = None
+    road_type_code: Optional[str] = None
     accident_type: Optional[str] = None
     accident_subtype: Optional[str] = None
+    cause_primary: Optional[str] = None
+    cause_secondary: Optional[str] = None
     severity: Optional[str] = None
     fatalities_count: Optional[int] = None
     serious_injuries: Optional[int] = None
@@ -113,11 +119,16 @@ class AccidentResponse(BaseModel):
     persons_involved: Optional[int] = None
     vehicles_involved: Optional[int] = None
     damage_czk: Optional[int] = None
+    damage_category: Optional[str] = None
     weather_condition: Optional[str] = None
     road_surface: Optional[str] = None
     light_condition: Optional[str] = None
+    road_condition: Optional[str] = None
+    vehicle_types: Optional[str] = None
     alcohol_involved: Optional[bool] = None
     drugs_involved: Optional[bool] = None
+    alcohol_level: Optional[float] = None
+    quality_score: Optional[int] = None
     segment_id: Optional[int] = None
 
 
@@ -160,17 +171,20 @@ class AlertsRequest(BaseModel):
 
 class AlertResponse(BaseModel):
     id: int
+    ingested_at: Optional[datetime] = None
     first_seen: Optional[datetime] = None
     last_seen: Optional[datetime] = None
     location: Optional[Polyline] = None
     city: Optional[str] = None
     street_name: Optional[str] = None
     road_number: Optional[str] = None
+    road_type_code: Optional[str] = None
     alert_type: Optional[str] = None
     alert_subtype: Optional[str] = None
     severity: Optional[str] = None
     description: Optional[str] = None
     active: Optional[bool] = None
+    quality_score: Optional[int] = None
     segment_id: Optional[int] = None
 
 
@@ -214,17 +228,20 @@ class JamsRequest(BaseModel):
 class JamResponse(BaseModel):
     id: int
     event_time: Optional[datetime] = None
+    ingested_at: Optional[datetime] = None
     first_seen: Optional[datetime] = None
     last_seen: Optional[datetime] = None
     jam_line: Optional[Polyline] = None
     city: Optional[str] = None
     street_name: Optional[str] = None
     road_number: Optional[str] = None
+    road_type_code: Optional[str] = None
     delay_seconds: Optional[float] = None
     length_m: Optional[float] = None
     speed_kmh: Optional[float] = None
     speed_normal_kmh: Optional[float] = None
     severity: Optional[str] = None
+    quality_score: Optional[int] = None
     segment_id: Optional[int] = None
 
 
@@ -267,7 +284,9 @@ class RestrictionsRequest(BaseModel):
 
 class RestrictionResponse(BaseModel):
     id: int
+    external_version: Optional[int] = None
     event_time: Optional[datetime] = None
+    ingested_at: Optional[datetime] = None
     valid_from: Optional[datetime] = None
     valid_to: Optional[datetime] = None
     first_seen: Optional[datetime] = None
@@ -277,14 +296,19 @@ class RestrictionResponse(BaseModel):
     city: Optional[str] = None
     street_name: Optional[str] = None
     road_number: Optional[str] = None
+    road_type_code: Optional[str] = None
+    km_from: Optional[float] = None
+    km_to: Optional[float] = None
     direction: Optional[str] = None
     restriction_type: Optional[str] = None
     restriction_subtype: Optional[str] = None
     urgency: Optional[str] = None
+    probability: Optional[str] = None
     severity: Optional[str] = None
     status: Optional[str] = None
     max_speed_kmh: Optional[int] = None
     description_cs: Optional[str] = None
+    quality_score: Optional[int] = None
     segment_id: Optional[int] = None
 
 
