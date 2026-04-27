@@ -150,7 +150,7 @@ async def getUser(data: dict, current_user: dict = Depends(get_current_user), db
 @router.get("/getTowns")
 async def getTowns(db: Session = Depends(get_db)):
     towns = db.query(Town).all()
-    return [{"id": t.id, "name": t.name, "active": t.active} for t in towns]
+    return [{"id": t.id, "name": t.name, "active": t.active, "description": t.description} for t in towns]
 
 @router.post("/getTown")
 async def getTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -227,11 +227,11 @@ async def SaveOldUser(data: dict, current_user: dict = Depends(get_current_user)
     editUser = db.query(User).filter(User.id == data.get("id")).first()
     user = db.query(User).filter(User.name == data.get("name")).first()
     if user:
-        if user.name != editUser.name:
+        if user.id != editUser.id:
             return {"error" : "Name"}
     user = db.query(User).filter(User.email == data.get("email")).first()
     if user:
-        if user.email != editUser.email:
+        if user.id != editUser.id:
             return {"error" : "Email"}
     AssingedTown = None
     if data.get("town") is not None:
@@ -364,6 +364,11 @@ async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user)
     editTown = db.query(Town).filter(Town.id == townValues.get("id")).first()
     show = db.query(Show).filter(Show.town == townValues.get("id")).first()
 
+    town = db.query(Town).filter(Town.name == townValues.get("name")).first()
+    if town:
+        if town.id != editTown.id:
+            return {"error" : "Name"}
+
     editTown.name = townValues.get("name")
     editTown.wazelink = townValues.get("wazelink")
     editTown.dbhost = townValues.get("dbhost")
@@ -422,6 +427,15 @@ async def DeleteTown(data: dict, current_user: dict = Depends(get_current_user),
     except Exception as e:
         return {"error" : "Db"}
 
+@router.post("/getCoverageArea")
+async def GetCoverageArea(data: dict, db: Session = Depends(get_db)):
+    town = db.query(Town).filter(Town.name == data.get("name")).first()
+    if town:
+        print(town)
+        return {"coveragearea": to_shape(town.coveragearea).wkt}
+    else:
+        print(data.get("name"))
+
 @router.post("/getTownSettings")
 async def GetTownSettings(data: dict, db: Session = Depends(get_db)):
     town = db.query(Town).filter(Town.name == data.get("name")).first()
@@ -440,22 +454,17 @@ async def GetTownSettings(data: dict, db: Session = Depends(get_db)):
         settingsData.sort(key=lambda x: x["varname"])
         return {"settings": settingsData}
     else:
-        defaultsettings = db.query(Settings).filter(Settings.town.is_(None)).all()
         settings = db.query(Settings).filter(Settings.town == town.id).all()
-        townDict = {s.settingname: s.setting for s in settings}
-
         mergedSettings = []
-        for default in defaultsettings:
-            value = townDict.get(default.settingname, default.setting)
-            
+        for default in settings:
             mergedSettings.append({
                 "varname": default.varname,
                 "settingname": default.settingname,
-                "setting": value,
+                "setting": default.setting,
                 "description": default.description,
                 "groupName": default.groupname,
             })
-            mergedSettings.sort(key=lambda x: x.varname)
+            mergedSettings.sort(key=lambda x: x["varname"])
         return {"settings": mergedSettings, 'id': town.id}
 
 #######################################
@@ -482,6 +491,11 @@ async def GetSettings(db: Session = Depends(get_db)):
 async def SaveSettings(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     setting = db.query(Settings).filter(Settings.id == data.get("Id")).first()
     allsettings = db.query(Settings).filter(Settings.varname == setting.varname).all()
+
+    defaultsettings = db.query(Settings).filter(Settings.town == None).all()
+    for defsetting in defaultsettings:
+        if defsetting.varname == setting.varname and defsetting.id != setting.id:
+            return {"error" : "Name"}    
 
     setting.settingname = data.get("Name")
     setting.setting = data.get("Value")
@@ -513,6 +527,11 @@ async def SaveNewSetting(data: dict, current_user: dict = Depends(get_current_us
         description =  data.get('AllDescription'),
         groupname =  data.get('AllGroupName')
     )
+
+    settings = db.query(Settings).filter(Settings.town == None).all()
+    for setting in settings:
+        if setting.varname == NewSetting.varname:
+            return {"error" : "Name"}
 
     try:
         db.add(NewSetting)
