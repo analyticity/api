@@ -33,7 +33,7 @@ import shapely
 from pyproj import Transformer
 from sklearn.cluster import DBSCAN
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
     average_precision_score,
@@ -43,6 +43,7 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
+from sklearn.inspection import permutation_importance
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
@@ -58,6 +59,9 @@ DEFAULT_OUTPUT_DIR    = (_SCRIPT_DIR / ".." / "models").resolve()
 
 # ─── Feature columns ──────────────────────────────────────────────────────────
 # Only features knowable BEFORE an accident — safe to use at inference time.
+# `accident_type` and `cause_primary` are deliberately excluded: both are
+# attributes recorded AFTER the event (data leakage) and at inference the API
+# has no way to supply them, so they always collapse to "unknown".
 
 CATEGORICAL_FEATURES = [
     "road_type_code",       # street / secondary / …
@@ -65,8 +69,6 @@ CATEGORICAL_FEATURES = [
     "road_surface",         # dry / wet / ice / …
     "light_condition",      # daylight / dark / …
     "road_condition",       # normal / slippery / …
-    "accident_type",        # collision / animal / …
-    "cause_primary",        # driver error / speed / …
 ]
 NUMERIC_FEATURES = [
     "hour",            # 0–23
@@ -90,15 +92,20 @@ _CLF_GRID_QUICK = {
     "model__max_depth":        [8, 12],
     "model__min_samples_leaf": [5],
 }
+# HistGradientBoostingRegressor with Gamma loss models the right-skewed
+# strictly-positive damage_czk target directly — no log1p / expm1 round-trip,
+# so predictions are not biased toward the geometric mean.
 _REG_GRID_FULL = {
-    "model__n_estimators":     [100, 200, 300],
-    "model__max_depth":        [8, 12, None],
-    "model__min_samples_leaf": [3, 5, 10],
+    "model__learning_rate":    [0.05, 0.1],
+    "model__max_iter":         [200, 400],
+    "model__max_leaf_nodes":   [15, 31],
+    "model__min_samples_leaf": [10, 20],
 }
 _REG_GRID_QUICK = {
-    "model__n_estimators":     [100, 200],
-    "model__max_depth":        [8, 12],
-    "model__min_samples_leaf": [5],
+    "model__learning_rate":    [0.1],
+    "model__max_iter":         [200],
+    "model__max_leaf_nodes":   [31],
+    "model__min_samples_leaf": [20],
 }
 
 
@@ -193,13 +200,39 @@ def _grid_size(param_grid: dict) -> int:
     return size
 
 
-def _print_feature_importances(pipeline: Pipeline, top_n: int = 10) -> list[dict]:
-    importances = pipeline.named_steps["model"].feature_importances_
+def _print_feature_importances(
+    pipeline: Pipeline,
+    top_n: int = 10,
+    *,
+    X_eval: pd.DataFrame | None = None,
+    y_eval: pd.Series | None = None,
+    scoring: str | None = None,
+) -> list[dict]:
+    """Show top feature importances.
+
+    Tree-based estimators expose ``feature_importances_`` directly. For
+    HistGradientBoosting (which does not), fall back to permutation importance
+    on the held-out evaluation set.
+    """
+    model = pipeline.named_steps["model"]
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    else:
+        if X_eval is None or y_eval is None:
+            print("  (feature importances unavailable)")
+            return []
+        result = permutation_importance(
+            pipeline, X_eval, y_eval,
+            n_repeats=10, random_state=42, n_jobs=-1, scoring=scoring,
+        )
+        importances = result.importances_mean
+
     ranked = sorted(zip(ALL_FEATURES, importances), key=lambda x: x[1], reverse=True)[:top_n]
     print(f"\n  Top {top_n} feature importances:")
+    max_imp = max((i for _, i in ranked), default=0.0) or 1.0
     for name, imp in ranked:
-        bar = "█" * int(imp * 50)
-        print(f"    {name:<22} {imp:.4f}  {bar}")
+        bar = "█" * max(0, int((imp / max_imp) * 30))
+        print(f"    {name:<22} {imp:>8.4f}  {bar}")
     return [{"feature": n, "importance": round(float(i), 6)} for n, i in ranked]
 
 
@@ -278,26 +311,28 @@ def tune_regressor(
     cv_std = gs.cv_results_["std_test_score"][gs.best_index_]
     log.info("Best params : %s", gs.best_params_)
 
-    y_pred_log = best.predict(X_test)
-    mae  = mean_absolute_error(np.expm1(y_test), np.expm1(y_pred_log))
-    rmse = np.sqrt(mean_squared_error(np.expm1(y_test), np.expm1(y_pred_log)))
-    r2   = r2_score(y_test, y_pred_log)
+    y_pred = best.predict(X_test)
+    mae  = mean_absolute_error(y_test, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    r2   = r2_score(y_test, y_pred)
 
     print("\n── Regressor ─────────────────────────────────────────────────")
     print(f"  Best params  : {gs.best_params_}")
-    print(f"  CV  MAE (log): {-gs.best_score_:.4f} ± {abs(cv_std):.4f}")
-    print(f"  Test MAE     : {mae:>12,.0f} CZK  (original scale)")
-    print(f"  Test RMSE    : {rmse:>12,.0f} CZK  (original scale)")
-    print(f"  Test R²      : {r2:.4f}             (log scale)")
-    importances = _print_feature_importances(best)
+    print(f"  CV  MAE      : {-gs.best_score_:>12,.0f} CZK  ± {abs(cv_std):,.0f}")
+    print(f"  Test MAE     : {mae:>12,.0f} CZK")
+    print(f"  Test RMSE    : {rmse:>12,.0f} CZK")
+    print(f"  Test R²      : {r2:.4f}")
+    importances = _print_feature_importances(
+        best, X_eval=X_test, y_eval=y_test, scoring="neg_mean_absolute_error",
+    )
 
     return best, {
         "best_params":         gs.best_params_,
-        "cv_mae_log_mean":     round(float(-gs.best_score_), 4),
-        "cv_mae_log_std":      round(float(abs(cv_std)), 4),
+        "cv_mae_czk_mean":     round(float(-gs.best_score_), 2),
+        "cv_mae_czk_std":      round(float(abs(cv_std)), 2),
         "test_mae_czk":        round(mae, 2),
         "test_rmse_czk":       round(rmse, 2),
-        "test_r2_log":         round(r2, 4),
+        "test_r2":             round(r2, 4),
         "feature_importances": importances,
     }
 
@@ -371,13 +406,19 @@ def main() -> None:
     )
 
     # ── 5. Regressor — how severe is the material damage? ────────────────────
-    # Drop rows with missing damage target; log-transform the right-skewed values.
-    reg_train = train_df[train_df["damage_czk"].notna()]
-    reg_test  = test_df[test_df["damage_czk"].notna()]
-    y_reg_train = np.log1p(reg_train["damage_czk"].astype(float))
-    y_reg_test  = np.log1p(reg_test["damage_czk"].astype(float))
+    # Gamma loss requires strictly positive targets; drop rows where damage is
+    # missing or zero. The model is trained directly on damage_czk so its
+    # output is already in CZK — no log/expm1 inversion bias.
+    reg_train = train_df[train_df["damage_czk"].notna() & (train_df["damage_czk"] > 0)]
+    reg_test  = test_df[test_df["damage_czk"].notna()  & (test_df["damage_czk"]  > 0)]
+    y_reg_train = reg_train["damage_czk"].astype(float)
+    y_reg_test  = reg_test["damage_czk"].astype(float)
+    log.info("Regressor data: %d train / %d test rows (positive damage only)",
+             len(reg_train), len(reg_test))
 
-    reg_base = build_pipeline(RandomForestRegressor(n_jobs=-1, random_state=42))
+    reg_base = build_pipeline(
+        HistGradientBoostingRegressor(loss="gamma", random_state=42)
+    )
     reg_pipeline, reg_metrics = tune_regressor(
         reg_base, reg_grid,
         reg_train[ALL_FEATURES], y_reg_train,
