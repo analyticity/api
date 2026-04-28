@@ -25,12 +25,6 @@ class PredictionRequest(BaseModel):
     road_condition: Optional[str] = Field(
         None, description="e.g. 'normal', 'slippery'. Derived from weather if omitted."
     )
-    accident_type: Optional[str] = Field(
-        None, description="Optional accident type hint (e.g. 'collision'). Defaults to 'unknown'."
-    )
-    cause_primary: Optional[str] = Field(
-        None, description="Optional primary cause hint (e.g. 'speed'). Defaults to 'unknown'."
-    )
 
 
 class TemporalFeatures(BaseModel):
@@ -74,8 +68,6 @@ class ScenarioRequest(BaseModel):
     road_surface: Optional[str] = Field(None, description="e.g. 'dry', 'wet', 'ice'")
     light_condition: Optional[str] = Field(None, description="e.g. 'daylight', 'dark'")
     road_condition: Optional[str] = Field(None, description="e.g. 'normal', 'slippery'")
-    accident_type: Optional[str] = Field(None, description="Optional accident type hint")
-    cause_primary: Optional[str] = Field(None, description="Optional primary cause hint")
 
     hour: Optional[int] = Field(None, ge=0, le=23, description="Hour of day, 0–23")
     day_of_week: Optional[int] = Field(None, ge=0, le=6, description="0 = Monday, 6 = Sunday")

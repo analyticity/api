@@ -71,14 +71,6 @@ async def predict_for_cluster(
         None,
         description="Current road condition (e.g. 'normal', 'slippery'). Derived from weather if omitted.",
     ),
-    accident_type: Optional[str] = Query(
-        None,
-        description="Optional accident type hint (e.g. 'collision'). Defaults to 'unknown'.",
-    ),
-    cause_primary: Optional[str] = Query(
-        None,
-        description="Optional primary cause hint (e.g. 'speed'). Defaults to 'unknown'.",
-    ),
     cluster_repo: ClusterRepository = Depends(_get_cluster_repo),
 ) -> PredictionResponse:
     if not PredictionService.is_ready():
@@ -98,8 +90,6 @@ async def predict_for_cluster(
             road_surface=road_surface,
             light_condition=light_condition,
             road_condition=road_condition,
-            accident_type=accident_type,
-            cause_primary=cause_primary,
         )
     except Exception as exc:
         logger.exception("Prediction failed for cluster %d: %s", cluster_id, exc)
@@ -157,8 +147,6 @@ async def predict_scenario(
             road_surface=request.road_surface,
             light_condition=request.light_condition,
             road_condition=request.road_condition,
-            accident_type=request.accident_type,
-            cause_primary=request.cause_primary,
             hour=request.hour,
             day_of_week=request.day_of_week,
             month=request.month,

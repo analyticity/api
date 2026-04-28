@@ -19,7 +19,6 @@ from typing import List, Optional
 
 import httpx
 import joblib
-import numpy as np
 import pandas as pd
 
 from app.config import get_settings
@@ -28,14 +27,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Feature column order must match scripts/train_model.py exactly.
+# Post-event attributes (accident_type, cause_primary) are intentionally absent:
+# they are not knowable before an accident and were causing leakage / "unknown"
+# collapse at inference time.
 _CATEGORICAL_FEATURES = [
     "road_type_code",
     "weather_condition",
     "road_surface",
     "light_condition",
     "road_condition",
-    "accident_type",
-    "cause_primary",
 ]
 _NUMERIC_FEATURES = [
     "hour",
@@ -187,8 +187,6 @@ class PredictionService:
         road_surface: Optional[str],
         light_condition: Optional[str],
         road_condition: Optional[str],
-        accident_type: Optional[str],
-        cause_primary: Optional[str],
     ) -> dict:
         """
         Build the feature row from temporal + weather context, run both models,
@@ -232,8 +230,6 @@ class PredictionService:
             "road_surface":      road_surface,
             "light_condition":   light_condition,
             "road_condition":    road_condition,
-            "accident_type":     accident_type or "unknown",
-            "cause_primary":     cause_primary or "unknown",
             "hour":              hour,
             "day_of_week":       day_of_week,
             "month":             month,
@@ -243,8 +239,10 @@ class PredictionService:
         }])
 
         # ── Inference ─────────────────────────────────────────────────────────
+        # Regressor is HistGradientBoostingRegressor with Gamma loss trained
+        # directly on damage_czk — its output is already in CZK.
         danger_prob = float(cls._clf.predict_proba(row)[0][1])
-        expected_damage = float(np.expm1(cls._reg.predict(row)[0]))
+        expected_damage = float(cls._reg.predict(row)[0])
         risk_level = "high" if danger_prob >= 0.6 else "medium" if danger_prob >= 0.3 else "low"
 
         return {
@@ -278,8 +276,6 @@ class PredictionService:
         road_surface: Optional[str],
         light_condition: Optional[str],
         road_condition: Optional[str],
-        accident_type: Optional[str],
-        cause_primary: Optional[str],
         hour: Optional[int],
         day_of_week: Optional[int],
         month: Optional[int],
@@ -300,8 +296,6 @@ class PredictionService:
         eff_surface = road_surface or "unknown"
         eff_light = light_condition or ("dark" if is_night else "daylight")
         eff_road_cond = road_condition or "unknown"
-        eff_accident = accident_type or "unknown"
-        eff_cause = cause_primary or "unknown"
 
         rows = []
         cluster_ids: List[int] = []
@@ -313,8 +307,6 @@ class PredictionService:
                 "road_surface":      eff_surface,
                 "light_condition":   eff_light,
                 "road_condition":    eff_road_cond,
-                "accident_type":     eff_accident,
-                "cause_primary":     eff_cause,
                 "hour":              eff_hour,
                 "day_of_week":       eff_dow,
                 "month":             eff_month,
@@ -325,7 +317,7 @@ class PredictionService:
 
         df = pd.DataFrame(rows)
         probs = cls._clf.predict_proba(df)[:, 1]
-        damages = np.expm1(cls._reg.predict(df))
+        damages = cls._reg.predict(df)
 
         items = []
         for cid, p, d in zip(cluster_ids, probs, damages):
