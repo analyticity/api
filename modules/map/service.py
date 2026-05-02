@@ -67,13 +67,16 @@ def get_accidents(
     """Get accidents with automatic fallback to example data"""
 
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[accidents] db=None, falling back to example data")
         return get_accidents_from_example(street_names, date_from, date_to)
 
+    logger.info(f"[accidents] db session available, calling DB query")
     try:
-        return get_accidents_from_db(db, street_names, date_from, date_to)
+        result = get_accidents_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[accidents] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[accidents] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_accidents_from_example(street_names, date_from, date_to)
 
 

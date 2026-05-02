@@ -191,6 +191,8 @@ def get_accidents_from_db(
 ) -> AccidentsResponse:
     """Get accidents for given streets and date range from database"""
 
+    logger.info(f"[accidents] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
     query = db.query(Accident).filter(
         Accident.ingested_at >= date_from,
         Accident.ingested_at <= date_to
@@ -200,6 +202,7 @@ def get_accidents_from_db(
         query = query.filter(Accident.street_name.in_(street_names))
 
     accidents_query = query.all()
+    logger.info(f"[accidents] raw rows from DB: {len(accidents_query)}")
 
     accidents_response = []
     for accident in accidents_query:
@@ -211,7 +214,7 @@ def get_accidents_from_db(
         accidents_response.append(
             AccidentResponse(
                 id=accident.id,
-                event_time=None,
+                event_time=accident.first_seen,
                 ingested_at=accident.ingested_at,
                 first_seen=accident.first_seen,
                 last_seen=accident.last_seen,
@@ -245,7 +248,7 @@ def get_accidents_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(accidents_response)} accidents from database")
+    logger.info(f"[accidents] built {len(accidents_response)} response objects")
 
     return AccidentsResponse(
         accidents=accidents_response,
@@ -344,7 +347,7 @@ def get_jams_from_db(
         jams_response.append(
             JamResponse(
                 id=jam.id,
-                event_time=None,
+                event_time=jam.first_seen,
                 ingested_at=jam.ingested_at,
                 first_seen=jam.first_seen,
                 last_seen=jam.last_seen,
