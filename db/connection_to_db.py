@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
 import psycopg2
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError
 from core.logging_config import get_logger
+
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -24,12 +25,12 @@ def is_database_available() -> bool:
     """Check if database connection is available"""
     global _db_available, _engine, _SessionLocal
 
-    if _db_available is not None:
-        return _db_available
+    # Once connected successfully, reuse the existing engine (pool_pre_ping handles reconnects)
+    if _db_available:
+        return True
 
     if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
         logger.warning("Database credentials not configured, using example data fallback")
-        _db_available = False
         return False
 
     try:
@@ -38,7 +39,7 @@ def is_database_available() -> bool:
         _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
         with _engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1")) 
 
         logger.info(f"Database connection successful: {DB_HOST}:{DB_PORT}/{DB_NAME}")
         _db_available = True
@@ -46,7 +47,8 @@ def is_database_available() -> bool:
 
     except (OperationalError, Exception) as e:
         logger.warning(f"Database connection failed: {e}. Using example data fallback")
-        _db_available = False
+        _engine = None
+        _SessionLocal = None
         return False
 
 

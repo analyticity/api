@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from geoalchemy2.functions import ST_AsGeoJSON
 import json
 
-from models import RoadSegment, TrafficJam, Accident, Alert, Restriction
+from models import RoadSegment, TrafficJam, Accident, Alert, Restriction, EventLink
 from modules.map.schema import (
     RoadSegmentResponse,
     SegmentStatistics,
@@ -19,6 +19,8 @@ from modules.map.schema import (
     JamsResponse,
     RestrictionResponse,
     RestrictionsResponse,
+    EventLinkResponse,
+    EventLinksResponse,
     Polyline
 )
 from core.logging_config import get_logger
@@ -45,14 +47,14 @@ def get_segment_statistics_from_db(
 
     jams_count = db.query(func.count(TrafficJam.id)).filter(
         TrafficJam.segment_id == segment_id,
-        TrafficJam.event_time >= date_from,
-        TrafficJam.event_time <= date_to
+        TrafficJam.ingested_at >= date_from,
+        TrafficJam.ingested_at <= date_to
     ).scalar() or 0
 
     accidents_count = db.query(func.count(Accident.id)).filter(
         Accident.segment_id == segment_id,
-        Accident.event_time >= date_from,
-        Accident.event_time <= date_to
+        Accident.ingested_at >= date_from,
+        Accident.ingested_at <= date_to
     ).scalar() or 0
 
     alerts_count = db.query(func.count(Alert.id)).filter(
@@ -189,15 +191,18 @@ def get_accidents_from_db(
 ) -> AccidentsResponse:
     """Get accidents for given streets and date range from database"""
 
+    logger.info(f"[accidents] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
     query = db.query(Accident).filter(
-        Accident.event_time >= date_from,
-        Accident.event_time <= date_to
+        Accident.ingested_at >= date_from,
+        Accident.ingested_at <= date_to
     )
 
     if street_names:
         query = query.filter(Accident.street_name.in_(street_names))
 
     accidents_query = query.all()
+    logger.info(f"[accidents] raw rows from DB: {len(accidents_query)}")
 
     accidents_response = []
     for accident in accidents_query:
@@ -209,7 +214,7 @@ def get_accidents_from_db(
         accidents_response.append(
             AccidentResponse(
                 id=accident.id,
-                event_time=accident.event_time,
+                event_time=accident.first_seen,
                 ingested_at=accident.ingested_at,
                 first_seen=accident.first_seen,
                 last_seen=accident.last_seen,
@@ -243,7 +248,7 @@ def get_accidents_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(accidents_response)} accidents from database")
+    logger.info(f"[accidents] built {len(accidents_response)} response objects")
 
     return AccidentsResponse(
         accidents=accidents_response,
@@ -322,9 +327,9 @@ def get_jams_from_db(
     """Get traffic jams for given streets and date range from database"""
 
     query = db.query(TrafficJam).filter(
-        TrafficJam.event_time >= date_from,
-        TrafficJam.event_time <= date_to
-    )
+        TrafficJam.ingested_at >= date_from,
+        TrafficJam.ingested_at <= date_to
+        )
 
     if street_names:
         query = query.filter(TrafficJam.street_name.in_(street_names))
@@ -342,7 +347,7 @@ def get_jams_from_db(
         jams_response.append(
             JamResponse(
                 id=jam.id,
-                event_time=jam.event_time,
+                event_time=jam.first_seen,
                 ingested_at=jam.ingested_at,
                 first_seen=jam.first_seen,
                 last_seen=jam.last_seen,
@@ -448,4 +453,139 @@ def get_restrictions_from_db(
         date_to=date_to
     )
 
+
+def get_event_links_from_db(
+    db: Session,
+    source_type: Optional[str],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links with optional filters from database"""
+
+    query = db.query(EventLink).filter(
+        EventLink.created_at >= date_from,
+        EventLink.created_at <= date_to
+    )
+
+    if source_type:
+        query = query.filter(EventLink.source_type == source_type)
+    if target_type:
+        query = query.filter(EventLink.target_type == target_type)
+
+    links = query.all()
+
+    links_response = [
+        EventLinkResponse(
+            id=link.id,
+            source_type=link.source_type,
+            source_id=link.source_id,
+            target_type=link.target_type,
+            target_id=link.target_id,
+            link_type=link.link_type,
+            confidence=link.confidence,
+            description=link.description,
+            created_at=link.created_at
+        )
+        for link in links
+    ]
+
+    logger.info(f"Loaded {len(links_response)} event links from database")
+
+    return EventLinksResponse(
+        event_links=links_response,
+        total_count=len(links_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_event_links_by_source_from_db(
+    db: Session,
+    source_ids: List[int],
+    source_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by source_ids from database"""
+
+    query = db.query(EventLink).filter(
+        EventLink.source_id.in_(source_ids),
+        EventLink.created_at >= date_from,
+        EventLink.created_at <= date_to
+    )
+
+    if source_type:
+        query = query.filter(EventLink.source_type == source_type)
+
+    links = query.all()
+
+    links_response = [
+        EventLinkResponse(
+            id=link.id,
+            source_type=link.source_type,
+            source_id=link.source_id,
+            target_type=link.target_type,
+            target_id=link.target_id,
+            link_type=link.link_type,
+            confidence=link.confidence,
+            description=link.description,
+            created_at=link.created_at
+        )
+        for link in links
+    ]
+
+    logger.info(f"Loaded {len(links_response)} event links by source from database")
+
+    return EventLinksResponse(
+        event_links=links_response,
+        total_count=len(links_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_event_links_by_target_from_db(
+    db: Session,
+    target_ids: List[int],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by target_ids from database"""
+
+    query = db.query(EventLink).filter(
+        EventLink.target_id.in_(target_ids),
+        EventLink.created_at >= date_from,
+        EventLink.created_at <= date_to
+    )
+
+    if target_type:
+        query = query.filter(EventLink.target_type == target_type)
+
+    links = query.all()
+
+    links_response = [
+        EventLinkResponse(
+            id=link.id,
+            source_type=link.source_type,
+            source_id=link.source_id,
+            target_type=link.target_type,
+            target_id=link.target_id,
+            link_type=link.link_type,
+            confidence=link.confidence,
+            description=link.description,
+            created_at=link.created_at
+        )
+        for link in links
+    ]
+
+    logger.info(f"Loaded {len(links_response)} event links by target from database")
+
+    return EventLinksResponse(
+        event_links=links_response,
+        total_count=len(links_response),
+        date_from=date_from,
+        date_to=date_to
+    )
 

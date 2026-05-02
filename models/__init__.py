@@ -1,5 +1,5 @@
 from models.road import RoadSegment
-from models.traffic import TrafficJam, Accident, Alert, Restriction
+from models.traffic import TrafficJam, Accident, Alert, Restriction, EventLink
 
 __all__ = [
     "RoadSegment",
@@ -7,5 +7,6 @@ __all__ = [
     "Accident",
     "Alert",
     "Restriction",
+    "EventLink",
 ]
 

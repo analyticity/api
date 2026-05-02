@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from modules.map.schema import StreetSegmentsResponse, RoadSegmentByIdResponse, AccidentsResponse, AlertsResponse, JamsResponse, RestrictionsResponse, EventLinksResponse
-from modules.map.service_db import get_street_segments_from_db, get_road_segment_by_id_from_db, get_accidents_from_db, get_alerts_from_db, get_jams_from_db, get_restrictions_from_db
+from modules.map.service_db import get_street_segments_from_db, get_road_segment_by_id_from_db, get_accidents_from_db, get_alerts_from_db, get_jams_from_db, get_restrictions_from_db, get_event_links_from_db, get_event_links_by_source_from_db, get_event_links_by_target_from_db
 from modules.map.service_examples import (
     get_street_segments_from_example,
     get_road_segment_by_id_from_example,
@@ -67,13 +67,16 @@ def get_accidents(
     """Get accidents with automatic fallback to example data"""
 
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[accidents] db=None, falling back to example data")
         return get_accidents_from_example(street_names, date_from, date_to)
 
+    logger.info(f"[accidents] db session available, calling DB query")
     try:
-        return get_accidents_from_db(db, street_names, date_from, date_to)
+        result = get_accidents_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[accidents] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[accidents] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_accidents_from_example(street_names, date_from, date_to)
 
 
@@ -148,7 +151,7 @@ def get_event_links(
         return get_event_links_from_example(source_type, target_type, date_from, date_to)
 
     try:
-        return get_event_links_from_example(source_type, target_type, date_from, date_to)
+        return get_event_links_from_db(db, source_type, target_type, date_from, date_to)
     except Exception as e:
         logger.error(f"Database query failed: {e}. Falling back to example data")
         return get_event_links_from_example(source_type, target_type, date_from, date_to)
@@ -168,7 +171,7 @@ def get_event_links_by_source(
         return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
 
     try:
-        return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
+        return get_event_links_by_source_from_db(db, source_ids, source_type, date_from, date_to)
     except Exception as e:
         logger.error(f"Database query failed: {e}. Falling back to example data")
         return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
@@ -188,7 +191,7 @@ def get_event_links_by_target(
         return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
 
     try:
-        return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
+        return get_event_links_by_target_from_db(db, target_ids, target_type, date_from, date_to)
     except Exception as e:
         logger.error(f"Database query failed: {e}. Falling back to example data")
         return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
