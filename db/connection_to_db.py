@@ -24,12 +24,12 @@ def is_database_available() -> bool:
     """Check if database connection is available"""
     global _db_available, _engine, _SessionLocal
 
-    if _db_available is not None:
-        return _db_available
+    # Once connected successfully, reuse the existing engine (pool_pre_ping handles reconnects)
+    if _db_available:
+        return True
 
     if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
         logger.warning("Database credentials not configured, using example data fallback")
-        _db_available = False
         return False
 
     try:
@@ -46,7 +46,8 @@ def is_database_available() -> bool:
 
     except (OperationalError, Exception) as e:
         logger.warning(f"Database connection failed: {e}. Using example data fallback")
-        _db_available = False
+        _engine = None
+        _SessionLocal = None
         return False
 
 
