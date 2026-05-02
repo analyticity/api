@@ -120,3 +120,16 @@ class Restriction(Base):
     raw = Column(JSONB, nullable=False)
     segment_id = Column(BigInteger)
 
+
+class EventLink(Base):
+    __tablename__ = "event_links"
+
+    id = Column(BigInteger, primary_key=True)
+    source_type = Column(Text, nullable=False)
+    source_id = Column(BigInteger, nullable=False)
+    target_type = Column(Text, nullable=False)
+    target_id = Column(BigInteger, nullable=False)
+    link_type = Column(Text, nullable=False)
+    confidence = Column(Integer)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True))
