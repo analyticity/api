@@ -1,9 +1,19 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from modules.map.schema import StreetSegmentsResponse, RoadSegmentByIdResponse, AccidentsResponse, AlertsResponse, JamsResponse, RestrictionsResponse
+from modules.map.schema import StreetSegmentsResponse, RoadSegmentByIdResponse, AccidentsResponse, AlertsResponse, JamsResponse, RestrictionsResponse, EventLinksResponse
 from modules.map.service_db import get_street_segments_from_db, get_road_segment_by_id_from_db, get_accidents_from_db, get_alerts_from_db, get_jams_from_db, get_restrictions_from_db
-from modules.map.service_examples import get_street_segments_from_example, get_road_segment_by_id_from_example, get_accidents_from_example, get_alerts_from_example, get_jams_from_example, get_restrictions_from_example
+from modules.map.service_examples import (
+    get_street_segments_from_example,
+    get_road_segment_by_id_from_example,
+    get_accidents_from_example,
+    get_alerts_from_example,
+    get_jams_from_example,
+    get_restrictions_from_example,
+    get_event_links_from_example,
+    get_event_links_by_source_from_example,
+    get_event_links_by_target_from_example,
+)
 from core.logging_config import get_logger
 from datetime import datetime
 
@@ -123,4 +133,63 @@ def get_restrictions(
         logger.error(f"Database query failed: {e}. Falling back to example data")
         return get_restrictions_from_example(street_names, date_from, date_to)
 
+
+def get_event_links(
+    db: Optional[Session],
+    source_type: Optional[str],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links with automatic fallback to example data"""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_event_links_from_example(source_type, target_type, date_from, date_to)
+
+    try:
+        return get_event_links_from_example(source_type, target_type, date_from, date_to)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_event_links_from_example(source_type, target_type, date_from, date_to)
+
+
+def get_event_links_by_source(
+    db: Optional[Session],
+    source_ids: List[int],
+    source_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by source_ids with automatic fallback to example data"""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
+
+    try:
+        return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
+
+
+def get_event_links_by_target(
+    db: Optional[Session],
+    target_ids: List[int],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by target_ids with automatic fallback to example data"""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
+
+    try:
+        return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
 

@@ -319,3 +319,111 @@ class RestrictionsResponse(BaseModel):
     date_to: datetime
 
 
+class EventLinksRequest(BaseModel):
+    source_type: Optional[str] = Field(default=None, description="Filter by source type (e.g. 'alert', 'restriction'). If None, returns all.")
+    target_type: Optional[str] = Field(default=None, description="Filter by target type (e.g. 'traffic_jam'). If None, returns all.")
+    date_from: datetime = Field(..., description="Start date for filtering by created_at")
+    date_to: datetime = Field(..., description="End date for filtering by created_at")
+
+    @field_validator('date_from', 'date_to', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        elif isinstance(v, datetime):
+            dt = v
+        else:
+            return v
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "source_type": "alert",
+                "target_type": "traffic_jam",
+                "date_from": "2026-04-01T00:00:00Z",
+                "date_to": "2026-04-30T23:59:59Z"
+            }
+        }
+
+
+class EventLinkResponse(BaseModel):
+    id: int
+    source_type: str
+    source_id: int
+    target_type: str
+    target_id: int
+    link_type: str
+    confidence: Optional[int] = None
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class EventLinksResponse(BaseModel):
+    event_links: List[EventLinkResponse]
+    total_count: int
+    date_from: datetime
+    date_to: datetime
+
+
+class EventLinksBySourceRequest(BaseModel):
+    source_ids: List[int] = Field(..., description="List of source_ids to filter by")
+    source_type: Optional[str] = Field(default=None, description="Optional source type filter (e.g. 'alert', 'restriction')")
+    date_from: datetime = Field(..., description="Start date for filtering by created_at")
+    date_to: datetime = Field(..., description="End date for filtering by created_at")
+
+    @field_validator('date_from', 'date_to', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        elif isinstance(v, datetime):
+            dt = v
+        else:
+            return v
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "source_ids": [8, 74],
+                "source_type": "alert",
+                "date_from": "2026-04-01T00:00:00Z",
+                "date_to": "2026-04-30T23:59:59Z"
+            }
+        }
+
+
+class EventLinksByTargetRequest(BaseModel):
+    target_ids: List[int] = Field(..., description="List of target_ids to filter by")
+    target_type: Optional[str] = Field(default=None, description="Optional target type filter (e.g. 'traffic_jam')")
+    date_from: datetime = Field(..., description="Start date for filtering by created_at")
+    date_to: datetime = Field(..., description="End date for filtering by created_at")
+
+    @field_validator('date_from', 'date_to', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        elif isinstance(v, datetime):
+            dt = v
+        else:
+            return v
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "target_ids": [283, 26, 28],
+                "target_type": "traffic_jam",
+                "date_from": "2026-04-01T00:00:00Z",
+                "date_to": "2026-04-30T23:59:59Z"
+            }
+        }
+

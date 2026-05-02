@@ -13,7 +13,9 @@ from modules.map.schema import (
     JamResponse,
     JamsResponse,
     RestrictionResponse,
-    RestrictionsResponse
+    RestrictionsResponse,
+    EventLinkResponse,
+    EventLinksResponse,
 )
 from core.example_data import ExampleDataLoader
 from core.logging_config import get_logger
@@ -360,4 +362,79 @@ def get_restrictions_from_example(
         date_to=date_to
     )
 
+
+def _build_event_links_response(links_data, date_from, date_to) -> EventLinksResponse:
+    links_response = [
+        EventLinkResponse(
+            id=link.get("id"),
+            source_type=link.get("source_type"),
+            source_id=link.get("source_id"),
+            target_type=link.get("target_type"),
+            target_id=link.get("target_id"),
+            link_type=link.get("link_type"),
+            confidence=link.get("confidence"),
+            description=link.get("description"),
+            created_at=link.get("created_at")
+        )
+        for link in links_data
+    ]
+    logger.info(f"Loaded {len(links_response)} event links from example data")
+    return EventLinksResponse(
+        event_links=links_response,
+        total_count=len(links_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_event_links_from_example(
+    source_type: Optional[str],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        source_type=source_type,
+        target_type=target_type,
+        date_from=date_from,
+        date_to=date_to
+    )
+
+    return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_event_links_by_source_from_example(
+    source_ids: List[int],
+    source_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by source_ids from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        source_type=source_type,
+        source_ids=source_ids,
+        date_from=date_from,
+        date_to=date_to
+    )
+    return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_event_links_by_target_from_example(
+    target_ids: List[int],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by target_ids from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        target_type=target_type,
+        target_ids=target_ids,
+        date_from=date_from,
+        date_to=date_to
+    )
+    return _build_event_links_response(links_data, date_from, date_to)
 
