@@ -1,10 +1,11 @@
 import os
 from dotenv import load_dotenv
 import psycopg2
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError
 from core.logging_config import get_logger
+
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -38,7 +39,7 @@ def is_database_available() -> bool:
         _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
         with _engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1")) 
 
         logger.info(f"Database connection successful: {DB_HOST}:{DB_PORT}/{DB_NAME}")
         _db_available = True
