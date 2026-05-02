@@ -9,7 +9,6 @@ class TrafficJam(Base):
 
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     first_seen = Column(DateTime(timezone=True))
     last_seen = Column(DateTime(timezone=True))
@@ -33,7 +32,6 @@ class Accident(Base):
 
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     first_seen = Column(DateTime(timezone=True))
     last_seen = Column(DateTime(timezone=True))
@@ -96,7 +94,6 @@ class Restriction(Base):
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
     external_version = Column(Integer)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     valid_from = Column(DateTime(timezone=True))
     valid_to = Column(DateTime(timezone=True))
