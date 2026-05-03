@@ -193,6 +193,24 @@ def get_accidents_from_db(
 
     logger.info(f"[accidents] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
 
+    total_count = db.query(func.count(Accident.id)).scalar()
+    logger.info(f"[accidents] total rows in accidents table (no filter): {total_count}")
+
+    date_count = db.query(func.count(Accident.id)).filter(
+        Accident.ingested_at >= date_from,
+        Accident.ingested_at <= date_to
+    ).scalar()
+    logger.info(f"[accidents] rows matching date filter only: {date_count}")
+
+    if street_names:
+        street_count = db.query(func.count(Accident.id)).filter(
+            Accident.street_name.in_(street_names)
+        ).scalar()
+        logger.info(f"[accidents] rows matching street filter only: {street_count}")
+
+    sample = db.query(Accident.street_name, Accident.ingested_at).limit(3).all()
+    logger.info(f"[accidents] sample rows (street_name, ingested_at): {sample}")
+
     query = db.query(Accident).filter(
         Accident.ingested_at >= date_from,
         Accident.ingested_at <= date_to
