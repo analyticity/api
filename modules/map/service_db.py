@@ -47,14 +47,14 @@ def get_segment_statistics_from_db(
 
     jams_count = db.query(func.count(TrafficJam.id)).filter(
         TrafficJam.segment_id == segment_id,
-        TrafficJam.ingested_at >= date_from,
-        TrafficJam.ingested_at <= date_to
+        TrafficJam.first_seen >= date_from,
+        TrafficJam.first_seen <= date_to
     ).scalar() or 0
 
     accidents_count = db.query(func.count(Accident.id)).filter(
         Accident.segment_id == segment_id,
-        Accident.ingested_at >= date_from,
-        Accident.ingested_at <= date_to
+        Accident.first_seen >= date_from,
+        Accident.first_seen <= date_to
     ).scalar() or 0
 
     alerts_count = db.query(func.count(Alert.id)).filter(
@@ -197,10 +197,10 @@ def get_accidents_from_db(
     logger.info(f"[accidents] total rows in accidents table (no filter): {total_count}")
 
     date_count = db.query(func.count(Accident.id)).filter(
-        Accident.ingested_at >= date_from,
-        Accident.ingested_at <= date_to
+        Accident.first_seen >= date_from,
+        Accident.first_seen <= date_to
     ).scalar()
-    logger.info(f"[accidents] rows matching date filter only: {date_count}")
+    logger.info(f"[accidents] rows matching date filter only (first_seen): {date_count}")
 
     if street_names:
         street_count = db.query(func.count(Accident.id)).filter(
@@ -208,12 +208,12 @@ def get_accidents_from_db(
         ).scalar()
         logger.info(f"[accidents] rows matching street filter only: {street_count}")
 
-    sample = db.query(Accident.street_name, Accident.ingested_at).limit(3).all()
-    logger.info(f"[accidents] sample rows (street_name, ingested_at): {sample}")
+    sample = db.query(Accident.street_name, Accident.first_seen).limit(3).all()
+    logger.info(f"[accidents] sample rows (street_name, first_seen): {sample}")
 
     query = db.query(Accident).filter(
-        Accident.ingested_at >= date_from,
-        Accident.ingested_at <= date_to
+        Accident.first_seen >= date_from,
+        Accident.first_seen <= date_to
     )
 
     if street_names:
@@ -345,9 +345,9 @@ def get_jams_from_db(
     """Get traffic jams for given streets and date range from database"""
 
     query = db.query(TrafficJam).filter(
-        TrafficJam.ingested_at >= date_from,
-        TrafficJam.ingested_at <= date_to
-        )
+        TrafficJam.first_seen >= date_from,
+        TrafficJam.first_seen <= date_to
+    )
 
     if street_names:
         query = query.filter(TrafficJam.street_name.in_(street_names))
