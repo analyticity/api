@@ -43,8 +43,6 @@ def get_segment_statistics_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> SegmentStatistics:
-    """Calculate event statistics for a road segment within date range from database"""
-
     jams_count = db.query(func.count(TrafficJam.id)).filter(
         TrafficJam.segment_id == segment_id,
         TrafficJam.first_seen >= date_from,
@@ -90,7 +88,10 @@ def get_street_segments_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> StreetSegmentsResponse:
-    """Get road segments for given streets with event statistics from database"""
+    logger.info(f"[segments] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
+    total_count = db.query(func.count(RoadSegment.id)).scalar()
+    logger.info(f"[segments] total rows in road_segments table: {total_count}")
 
     query = db.query(
         RoadSegment.id,
@@ -107,6 +108,7 @@ def get_street_segments_from_db(
         query = query.filter(RoadSegment.name.in_(street_names))
 
     segments_query = query.all()
+    logger.info(f"[segments] raw rows from DB: {len(segments_query)}")
 
     segments_response = []
     for segment in segments_query:
@@ -127,7 +129,7 @@ def get_street_segments_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(segments_response)} segments from database for streets: {street_names}")
+    logger.info(f"[segments] built {len(segments_response)} response objects")
 
     return StreetSegmentsResponse(
         segments=segments_response,
@@ -143,7 +145,7 @@ def get_road_segment_by_id_from_db(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None
 ) -> Optional[RoadSegmentByIdResponse]:
-    """Get single road segment by ID from database"""
+    logger.info(f"[segment-by-id] querying DB: segment_id={segment_id}, date_from={date_from}, date_to={date_to}")
 
     segment = db.query(
         RoadSegment.id,
@@ -157,7 +159,7 @@ def get_road_segment_by_id_from_db(
     ).filter(RoadSegment.id == segment_id).first()
 
     if not segment:
-        logger.warning(f"Road segment {segment_id} not found in database")
+        logger.warning(f"[segment-by-id] segment {segment_id} not found in DB")
         return None
 
     coordinates = parse_geojson_to_coordinates(segment.geog_json)
@@ -166,21 +168,21 @@ def get_road_segment_by_id_from_db(
     if date_from and date_to:
         statistics = get_segment_statistics_from_db(db, segment_id, date_from, date_to)
 
-    segment_response = RoadSegmentResponse(
-        id=segment.id,
-        osm_id=segment.osm_id,
-        name=segment.name,
-        road_ref=segment.road_ref,
-        road_class=segment.road_class,
-        city=segment.city,
-        max_speed=segment.max_speed,
-        coordinates=coordinates,
-        statistics=statistics
+    logger.info(f"[segment-by-id] found segment {segment_id}, stats: {statistics}")
+
+    return RoadSegmentByIdResponse(
+        segment=RoadSegmentResponse(
+            id=segment.id,
+            osm_id=segment.osm_id,
+            name=segment.name,
+            road_ref=segment.road_ref,
+            road_class=segment.road_class,
+            city=segment.city,
+            max_speed=segment.max_speed,
+            coordinates=coordinates,
+            statistics=statistics
+        )
     )
-
-    logger.info(f"Loaded segment {segment_id} from database")
-
-    return RoadSegmentByIdResponse(segment=segment_response)
 
 
 def get_accidents_from_db(
@@ -189,8 +191,6 @@ def get_accidents_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> AccidentsResponse:
-    """Get accidents for given streets and date range from database"""
-
     logger.info(f"[accidents] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
 
     total_count = db.query(func.count(Accident.id)).scalar()
@@ -207,9 +207,6 @@ def get_accidents_from_db(
             Accident.street_name.in_(street_names)
         ).scalar()
         logger.info(f"[accidents] rows matching street filter only: {street_count}")
-
-    sample = db.query(Accident.street_name, Accident.first_seen).limit(3).all()
-    logger.info(f"[accidents] sample rows (street_name, first_seen): {sample}")
 
     query = db.query(Accident).filter(
         Accident.first_seen >= date_from,
@@ -282,7 +279,25 @@ def get_alerts_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> AlertsResponse:
-    """Get alerts for given streets and date range from database"""
+    logger.info(f"[alerts] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
+    total_count = db.query(func.count(Alert.id)).scalar()
+    logger.info(f"[alerts] total rows in alerts table (no filter): {total_count}")
+
+    date_count = db.query(func.count(Alert.id)).filter(
+        or_(
+            and_(Alert.first_seen >= date_from, Alert.first_seen <= date_to),
+            and_(Alert.last_seen >= date_from, Alert.last_seen <= date_to),
+            and_(Alert.first_seen <= date_from, Alert.last_seen >= date_to)
+        )
+    ).scalar()
+    logger.info(f"[alerts] rows matching date filter only (first_seen/last_seen): {date_count}")
+
+    if street_names:
+        street_count = db.query(func.count(Alert.id)).filter(
+            Alert.street_name.in_(street_names)
+        ).scalar()
+        logger.info(f"[alerts] rows matching street filter only: {street_count}")
 
     query = db.query(Alert).filter(
         or_(
@@ -296,6 +311,7 @@ def get_alerts_from_db(
         query = query.filter(Alert.street_name.in_(street_names))
 
     alerts_query = query.all()
+    logger.info(f"[alerts] raw rows from DB: {len(alerts_query)}")
 
     alerts_response = []
     for alert in alerts_query:
@@ -326,7 +342,7 @@ def get_alerts_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(alerts_response)} alerts from database")
+    logger.info(f"[alerts] built {len(alerts_response)} response objects")
 
     return AlertsResponse(
         alerts=alerts_response,
@@ -342,7 +358,22 @@ def get_jams_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> JamsResponse:
-    """Get traffic jams for given streets and date range from database"""
+    logger.info(f"[jams] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
+    total_count = db.query(func.count(TrafficJam.id)).scalar()
+    logger.info(f"[jams] total rows in traffic_jams table (no filter): {total_count}")
+
+    date_count = db.query(func.count(TrafficJam.id)).filter(
+        TrafficJam.first_seen >= date_from,
+        TrafficJam.first_seen <= date_to
+    ).scalar()
+    logger.info(f"[jams] rows matching date filter only (first_seen): {date_count}")
+
+    if street_names:
+        street_count = db.query(func.count(TrafficJam.id)).filter(
+            TrafficJam.street_name.in_(street_names)
+        ).scalar()
+        logger.info(f"[jams] rows matching street filter only: {street_count}")
 
     query = db.query(TrafficJam).filter(
         TrafficJam.first_seen >= date_from,
@@ -353,6 +384,7 @@ def get_jams_from_db(
         query = query.filter(TrafficJam.street_name.in_(street_names))
 
     jams_query = query.all()
+    logger.info(f"[jams] raw rows from DB: {len(jams_query)}")
 
     jams_response = []
     for jam in jams_query:
@@ -384,7 +416,7 @@ def get_jams_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(jams_response)} jams from database")
+    logger.info(f"[jams] built {len(jams_response)} response objects")
 
     return JamsResponse(
         jams=jams_response,
@@ -400,7 +432,26 @@ def get_restrictions_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> RestrictionsResponse:
-    """Get restrictions for given streets and date range from database"""
+    logger.info(f"[restrictions] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
+    total_count = db.query(func.count(Restriction.id)).scalar()
+    logger.info(f"[restrictions] total rows in restrictions table (no filter): {total_count}")
+
+    date_count = db.query(func.count(Restriction.id)).filter(
+        or_(
+            and_(Restriction.valid_from >= date_from, Restriction.valid_from <= date_to),
+            and_(Restriction.valid_to >= date_from, Restriction.valid_to <= date_to),
+            and_(Restriction.valid_from <= date_from, Restriction.valid_to >= date_to),
+            and_(Restriction.valid_from.is_(None), Restriction.valid_to.is_(None))
+        )
+    ).scalar()
+    logger.info(f"[restrictions] rows matching date filter only (valid_from/valid_to): {date_count}")
+
+    if street_names:
+        street_count = db.query(func.count(Restriction.id)).filter(
+            Restriction.street_name.in_(street_names)
+        ).scalar()
+        logger.info(f"[restrictions] rows matching street filter only: {street_count}")
 
     query = db.query(Restriction).filter(
         or_(
@@ -415,6 +466,7 @@ def get_restrictions_from_db(
         query = query.filter(Restriction.street_name.in_(street_names))
 
     restrictions_query = query.all()
+    logger.info(f"[restrictions] raw rows from DB: {len(restrictions_query)}")
 
     restrictions_response = []
     for restriction in restrictions_query:
@@ -434,7 +486,7 @@ def get_restrictions_from_db(
             RestrictionResponse(
                 id=restriction.id,
                 external_version=restriction.external_version,
-                event_time=restriction.event_time,
+                event_time=None,
                 ingested_at=restriction.ingested_at,
                 valid_from=restriction.valid_from,
                 valid_to=restriction.valid_to,
@@ -462,7 +514,7 @@ def get_restrictions_from_db(
             )
         )
 
-    logger.info(f"Loaded {len(restrictions_response)} restrictions from database")
+    logger.info(f"[restrictions] built {len(restrictions_response)} response objects")
 
     return RestrictionsResponse(
         restrictions=restrictions_response,
@@ -479,7 +531,10 @@ def get_event_links_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links with optional filters from database"""
+    logger.info(f"[event-links] querying DB: source_type={source_type}, target_type={target_type}, date_from={date_from}, date_to={date_to}")
+
+    total_count = db.query(func.count(EventLink.id)).scalar()
+    logger.info(f"[event-links] total rows in event_links table (no filter): {total_count}")
 
     query = db.query(EventLink).filter(
         EventLink.created_at >= date_from,
@@ -492,6 +547,7 @@ def get_event_links_from_db(
         query = query.filter(EventLink.target_type == target_type)
 
     links = query.all()
+    logger.info(f"[event-links] raw rows from DB: {len(links)}")
 
     links_response = [
         EventLinkResponse(
@@ -508,7 +564,7 @@ def get_event_links_from_db(
         for link in links
     ]
 
-    logger.info(f"Loaded {len(links_response)} event links from database")
+    logger.info(f"[event-links] built {len(links_response)} response objects")
 
     return EventLinksResponse(
         event_links=links_response,
@@ -525,7 +581,7 @@ def get_event_links_by_source_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links filtered by source_ids from database"""
+    logger.info(f"[event-links-by-source] querying DB: source_ids={source_ids}, source_type={source_type}, date_from={date_from}, date_to={date_to}")
 
     query = db.query(EventLink).filter(
         EventLink.source_id.in_(source_ids),
@@ -537,6 +593,7 @@ def get_event_links_by_source_from_db(
         query = query.filter(EventLink.source_type == source_type)
 
     links = query.all()
+    logger.info(f"[event-links-by-source] raw rows from DB: {len(links)}")
 
     links_response = [
         EventLinkResponse(
@@ -553,7 +610,7 @@ def get_event_links_by_source_from_db(
         for link in links
     ]
 
-    logger.info(f"Loaded {len(links_response)} event links by source from database")
+    logger.info(f"[event-links-by-source] built {len(links_response)} response objects")
 
     return EventLinksResponse(
         event_links=links_response,
@@ -570,7 +627,7 @@ def get_event_links_by_target_from_db(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links filtered by target_ids from database"""
+    logger.info(f"[event-links-by-target] querying DB: target_ids={target_ids}, target_type={target_type}, date_from={date_from}, date_to={date_to}")
 
     query = db.query(EventLink).filter(
         EventLink.target_id.in_(target_ids),
@@ -582,6 +639,7 @@ def get_event_links_by_target_from_db(
         query = query.filter(EventLink.target_type == target_type)
 
     links = query.all()
+    logger.info(f"[event-links-by-target] raw rows from DB: {len(links)}")
 
     links_response = [
         EventLinkResponse(
@@ -598,7 +656,7 @@ def get_event_links_by_target_from_db(
         for link in links
     ]
 
-    logger.info(f"Loaded {len(links_response)} event links by target from database")
+    logger.info(f"[event-links-by-target] built {len(links_response)} response objects")
 
     return EventLinksResponse(
         event_links=links_response,
@@ -606,4 +664,3 @@ def get_event_links_by_target_from_db(
         date_from=date_from,
         date_to=date_to
     )
-

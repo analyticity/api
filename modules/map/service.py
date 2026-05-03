@@ -26,16 +26,17 @@ def get_street_segments(
     date_from: datetime,
     date_to: datetime
 ) -> StreetSegmentsResponse:
-    """Get street segments with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[segments] db=None, falling back to example data")
         return get_street_segments_from_example(street_names, date_from, date_to)
 
+    logger.info("[segments] db session available, calling DB query")
     try:
-        return get_street_segments_from_db(db, street_names, date_from, date_to)
+        result = get_street_segments_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[segments] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[segments] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_street_segments_from_example(street_names, date_from, date_to)
 
 
@@ -45,16 +46,17 @@ def get_road_segment_by_id(
     date_from: Optional[datetime] = None,
     date_to: Optional[datetime] = None
 ) -> Optional[RoadSegmentByIdResponse]:
-    """Get single road segment by ID with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning(f"[segment-by-id] db=None, falling back to example data")
         return get_road_segment_by_id_from_example(segment_id, date_from, date_to)
 
+    logger.info(f"[segment-by-id] db session available, calling DB query for segment_id={segment_id}")
     try:
-        return get_road_segment_by_id_from_db(db, segment_id, date_from, date_to)
+        result = get_road_segment_by_id_from_db(db, segment_id, date_from, date_to)
+        logger.info(f"[segment-by-id] DB query succeeded, found={result is not None}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[segment-by-id] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_road_segment_by_id_from_example(segment_id, date_from, date_to)
 
 
@@ -64,13 +66,11 @@ def get_accidents(
     date_from: datetime,
     date_to: datetime
 ) -> AccidentsResponse:
-    """Get accidents with automatic fallback to example data"""
-
     if db is None:
         logger.warning("[accidents] db=None, falling back to example data")
         return get_accidents_from_example(street_names, date_from, date_to)
 
-    logger.info(f"[accidents] db session available, calling DB query")
+    logger.info("[accidents] db session available, calling DB query")
     try:
         result = get_accidents_from_db(db, street_names, date_from, date_to)
         logger.info(f"[accidents] DB query succeeded, total_count={result.total_count}")
@@ -86,16 +86,17 @@ def get_alerts(
     date_from: datetime,
     date_to: datetime
 ) -> AlertsResponse:
-    """Get alerts with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[alerts] db=None, falling back to example data")
         return get_alerts_from_example(street_names, date_from, date_to)
 
+    logger.info("[alerts] db session available, calling DB query")
     try:
-        return get_alerts_from_db(db, street_names, date_from, date_to)
+        result = get_alerts_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[alerts] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[alerts] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_alerts_from_example(street_names, date_from, date_to)
 
 
@@ -105,16 +106,17 @@ def get_jams(
     date_from: datetime,
     date_to: datetime
 ) -> JamsResponse:
-    """Get traffic jams with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[jams] db=None, falling back to example data")
         return get_jams_from_example(street_names, date_from, date_to)
 
+    logger.info("[jams] db session available, calling DB query")
     try:
-        return get_jams_from_db(db, street_names, date_from, date_to)
+        result = get_jams_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[jams] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[jams] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_jams_from_example(street_names, date_from, date_to)
 
 
@@ -124,16 +126,17 @@ def get_restrictions(
     date_from: datetime,
     date_to: datetime
 ) -> RestrictionsResponse:
-    """Get restrictions with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[restrictions] db=None, falling back to example data")
         return get_restrictions_from_example(street_names, date_from, date_to)
 
+    logger.info("[restrictions] db session available, calling DB query")
     try:
-        return get_restrictions_from_db(db, street_names, date_from, date_to)
+        result = get_restrictions_from_db(db, street_names, date_from, date_to)
+        logger.info(f"[restrictions] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[restrictions] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_restrictions_from_example(street_names, date_from, date_to)
 
 
@@ -144,16 +147,17 @@ def get_event_links(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[event-links] db=None, falling back to example data")
         return get_event_links_from_example(source_type, target_type, date_from, date_to)
 
+    logger.info("[event-links] db session available, calling DB query")
     try:
-        return get_event_links_from_db(db, source_type, target_type, date_from, date_to)
+        result = get_event_links_from_db(db, source_type, target_type, date_from, date_to)
+        logger.info(f"[event-links] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[event-links] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_event_links_from_example(source_type, target_type, date_from, date_to)
 
 
@@ -164,16 +168,17 @@ def get_event_links_by_source(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links filtered by source_ids with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[event-links-by-source] db=None, falling back to example data")
         return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
 
+    logger.info(f"[event-links-by-source] db session available, calling DB query for source_ids={source_ids}")
     try:
-        return get_event_links_by_source_from_db(db, source_ids, source_type, date_from, date_to)
+        result = get_event_links_by_source_from_db(db, source_ids, source_type, date_from, date_to)
+        logger.info(f"[event-links-by-source] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[event-links-by-source] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
 
 
@@ -184,15 +189,15 @@ def get_event_links_by_target(
     date_from: datetime,
     date_to: datetime
 ) -> EventLinksResponse:
-    """Get event links filtered by target_ids with automatic fallback to example data"""
-
     if db is None:
-        logger.warning("Database unavailable, using example data fallback")
+        logger.warning("[event-links-by-target] db=None, falling back to example data")
         return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
 
+    logger.info(f"[event-links-by-target] db session available, calling DB query for target_ids={target_ids}")
     try:
-        return get_event_links_by_target_from_db(db, target_ids, target_type, date_from, date_to)
+        result = get_event_links_by_target_from_db(db, target_ids, target_type, date_from, date_to)
+        logger.info(f"[event-links-by-target] DB query succeeded, total_count={result.total_count}")
+        return result
     except Exception as e:
-        logger.error(f"Database query failed: {e}. Falling back to example data")
+        logger.error(f"[event-links-by-target] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_event_links_by_target_from_example(target_ids, target_type, date_from, date_to)
-
