@@ -1,9 +1,11 @@
 import os
 from dotenv import load_dotenv
+import psycopg2
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import OperationalError
 from core.logging_config import get_logger
+
 
 load_dotenv()
 logger = get_logger(__name__)
@@ -23,15 +25,12 @@ def _init_engine() -> bool:
     """Create engine once per worker process. Returns False if credentials are missing."""
     global _engine, _SessionLocal, _credentials_ok
 
-    if _credentials_ok is False:
-        return False
-
-    if _engine is not None:
+    # Once connected successfully, reuse the existing engine (pool_pre_ping handles reconnects)
+    if _db_available:
         return True
 
     if not all([DB_HOST, DB_NAME, DB_USER, DB_PASSWORD]):
         logger.warning("Database credentials not configured, using example data fallback")
-        _credentials_ok = False
         return False
 
     DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -54,10 +53,16 @@ def is_database_available() -> bool:
         return False
     try:
         with _engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+            conn.execute(text("SELECT 1")) 
+
+        logger.info(f"Database connection successful: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+        _db_available = True
         return True
-    except Exception as e:
-        logger.warning(f"Database ping failed: {e}")
+
+    except (OperationalError, Exception) as e:
+        logger.warning(f"Database connection failed: {e}. Using example data fallback")
+        _engine = None
+        _SessionLocal = None
         return False
 
 
