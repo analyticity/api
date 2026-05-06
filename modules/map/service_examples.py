@@ -16,6 +16,7 @@ from modules.map.schema import (
     RestrictionsResponse,
     EventLinkResponse,
     EventLinksResponse,
+    NearestStreetResponse,
 )
 from core.example_data import ExampleDataLoader
 from core.logging_config import get_logger
@@ -437,4 +438,73 @@ def get_event_links_by_target_from_example(
         date_to=date_to
     )
     return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_nearest_street_from_example(
+    lat: float,
+    lon: float,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> Optional[NearestStreetResponse]:
+    """Fallback: treat the first example segment's street as the found street."""
+
+    all_segments_data = ExampleDataLoader.get_road_segments(None)
+    if not all_segments_data:
+        logger.warning("No example road segments available for nearest-street fallback")
+        return None
+
+    # Identify the "nearest" street from the first segment
+    nearest = all_segments_data[0]
+    street_name = nearest.get("name")
+    city = nearest.get("city")
+    nearest_id = nearest.get("id")
+
+    # Collect all example segments that share the same street name + city
+    if street_name is None:
+        matching = [nearest]
+    else:
+        matching = [
+            s for s in all_segments_data
+            if s.get("name") == street_name and (city is None or s.get("city") == city)
+        ]
+
+    segments_response = []
+    for seg in matching:
+        seg_id = seg.get("id")
+        coordinates = seg.get("geog")
+        if not coordinates:
+            continue
+
+        if date_from and date_to:
+            statistics = get_segment_statistics_from_example(seg_id, date_from, date_to)
+        else:
+            statistics = SegmentStatistics(
+                jams_count=0,
+                accidents_count=0,
+                alerts_count=0,
+                restrictions_count=0
+            )
+
+        road_ref = seg.get("road_ref")
+        segments_response.append(RoadSegmentResponse(
+            id=seg_id,
+            osm_id=seg.get("osm_id"),
+            name=seg.get("name"),
+            road_ref=str(road_ref) if road_ref is not None else None,
+            road_class=str(seg.get("road_class")),
+            city=seg.get("city"),
+            max_speed=seg.get("max_speed"),
+            coordinates=coordinates,
+            statistics=statistics
+        ))
+
+    logger.info(f"Nearest street fallback: {len(segments_response)} segments for street {street_name!r}")
+    return NearestStreetResponse(
+        street_name=street_name,
+        city=city,
+        segments=segments_response,
+        total_count=len(segments_response),
+        nearest_segment_id=nearest_id,
+        distance_m=0.0
+    )
 
