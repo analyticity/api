@@ -19,6 +19,8 @@ from modules.map.schema import (
     EventLinksResponse,
     EventLinksBySourceRequest,
     EventLinksByTargetRequest,
+    NearestStreetRequest,
+    NearestStreetResponse,
 )
 from modules.map.service import (
     get_street_segments,
@@ -30,6 +32,7 @@ from modules.map.service import (
     get_event_links,
     get_event_links_by_source,
     get_event_links_by_target,
+    get_nearest_street,
 )
 from db.connection_to_db import get_db
 from core.logging_config import get_logger
@@ -228,6 +231,116 @@ def get_road_segment_by_id_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve road segment: {str(e)}"
+        )
+
+
+@router.post(
+    "/nearest-street",
+    response_model=NearestStreetResponse,
+    summary="Find nearest road segment to a coordinate",
+    description="""
+    Given a geographic coordinate (e.g. from a Leaflet click event):
+    1. Finds the **single nearest** road segment using a PostGIS KNN index scan.
+    2. Reads the street name (and city) from that segment.
+    3. Returns **all** road segments that share that street name+city, each with event statistics.
+
+    If **date_from** and **date_to** are provided, statistics are scoped to that
+    date range; otherwise all-time totals are returned.
+
+    Statistics per segment include:
+    - Number of traffic jams
+    - Number of accidents
+    - Number of alerts
+    - Number of restrictions
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully found street and returned all its segments",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "street_name": "Kounicova",
+                        "city": "Brno",
+                        "nearest_segment_id": 8181,
+                        "distance_m": 14.7,
+                        "total_count": 3,
+                        "segments": [
+                            {
+                                "id": 8181,
+                                "osm_id": 205262250,
+                                "name": "Kounicova",
+                                "road_ref": None,
+                                "road_class": "secondary",
+                                "city": "Brno",
+                                "max_speed": 50,
+                                "coordinates": [[16.608, 49.195], [16.609, 49.196]],
+                                "statistics": {
+                                    "jams_count": 3,
+                                    "accidents_count": 1,
+                                    "alerts_count": 2,
+                                    "restrictions_count": 0
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        404: {"description": "No road segments found in database"},
+        422: {"description": "Validation error in request data"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_nearest_street_endpoint(
+    request: NearestStreetRequest,
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> NearestStreetResponse:
+    """
+    Return the road segment nearest to the given coordinates.
+
+    Args:
+        request: Latitude, longitude, and optional date range for statistics
+        db: Database session (None if unavailable, triggers fallback mode)
+
+    Returns:
+        Nearest road segment with coordinates, metadata, and event statistics
+    """
+
+    logger.info(
+        f"Nearest street request: lat={request.lat}, lon={request.lon}, "
+        f"date_range: {request.date_from} to {request.date_to}"
+    )
+
+    try:
+        result = get_nearest_street(
+            db=db,
+            lat=request.lat,
+            lon=request.lon,
+            date_from=request.date_from,
+            date_to=request.date_to
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No road segments found near the provided coordinates"
+            )
+
+        logger.info(
+            f"Returning {result.total_count} segments for street {result.street_name!r}, "
+            f"nearest_id={result.nearest_segment_id}, distance={result.distance_m:.1f}m"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing nearest street request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to find nearest street: {str(e)}"
         )
 
 

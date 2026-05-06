@@ -398,6 +398,47 @@ class EventLinksBySourceRequest(BaseModel):
         }
 
 
+class NearestStreetRequest(BaseModel):
+    lat: float = Field(..., description="Latitude of the clicked point", ge=-90, le=90)
+    lon: float = Field(..., description="Longitude of the clicked point", ge=-180, le=180)
+    date_from: Optional[datetime] = Field(default=None, description="Start date for statistics (if omitted, all-time counts are returned)")
+    date_to: Optional[datetime] = Field(default=None, description="End date for statistics (if omitted, all-time counts are returned)")
+
+    @field_validator('date_from', 'date_to', mode='before')
+    @classmethod
+    def ensure_timezone_aware(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            dt = datetime.fromisoformat(v.replace('Z', '+00:00'))
+        elif isinstance(v, datetime):
+            dt = v
+        else:
+            return v
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "lat": 49.195,
+                "lon": 16.608,
+                "date_from": "2026-04-01T00:00:00Z",
+                "date_to": "2026-04-30T23:59:59Z"
+            }
+        }
+
+
+class NearestStreetResponse(BaseModel):
+    street_name: Optional[str] = Field(None, description="Name of the found street")
+    city: Optional[str] = Field(None, description="City of the found street")
+    segments: List[RoadSegmentResponse] = Field(..., description="All road segments belonging to this street")
+    total_count: int = Field(..., description="Total number of segments for this street")
+    nearest_segment_id: int = Field(..., description="ID of the segment closest to the clicked point")
+    distance_m: float = Field(..., description="Distance in metres from the clicked point to the nearest segment")
+
+
 class EventLinksByTargetRequest(BaseModel):
     target_ids: List[int] = Field(..., description="List of target_ids to filter by")
     target_type: Optional[str] = Field(default=None, description="Optional target type filter (e.g. 'traffic_jam')")

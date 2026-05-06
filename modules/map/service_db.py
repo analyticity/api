@@ -21,6 +21,7 @@ from modules.map.schema import (
     RestrictionsResponse,
     EventLinkResponse,
     EventLinksResponse,
+    NearestStreetResponse,
     Polyline
 )
 from core.logging_config import get_logger
@@ -587,5 +588,119 @@ def get_event_links_by_target_from_db(
         total_count=len(links_response),
         date_from=date_from,
         date_to=date_to
+    )
+
+
+def get_segment_statistics_alltime_from_db(db: Session, segment_id: int) -> SegmentStatistics:
+    """Count all events for a segment with no date filter."""
+
+    jams_count = db.query(func.count(TrafficJam.id)).filter(
+        TrafficJam.segment_id == segment_id
+    ).scalar() or 0
+
+    accidents_count = db.query(func.count(Accident.id)).filter(
+        Accident.segment_id == segment_id
+    ).scalar() or 0
+
+    alerts_count = db.query(func.count(Alert.id)).filter(
+        Alert.segment_id == segment_id
+    ).scalar() or 0
+
+    restrictions_count = db.query(func.count(Restriction.id)).filter(
+        Restriction.segment_id == segment_id
+    ).scalar() or 0
+
+    return SegmentStatistics(
+        jams_count=jams_count,
+        accidents_count=accidents_count,
+        alerts_count=alerts_count,
+        restrictions_count=restrictions_count
+    )
+
+
+def get_nearest_street_from_db(
+    db: Session,
+    lat: float,
+    lon: float,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> Optional[NearestStreetResponse]:
+    """
+    1. KNN-find the single nearest segment to (lat, lon).
+    2. Take its street name (and city) and load ALL segments for that street.
+    3. Return every segment with its statistics.
+    """
+
+    point_geog = func.ST_GeographyFromText(f'POINT({lon} {lat})')
+
+    nearest = db.query(
+        RoadSegment.id,
+        RoadSegment.name,
+        RoadSegment.city,
+        func.ST_Distance(RoadSegment.geog, point_geog).label('distance_m')
+    ).order_by(
+        func.ST_Distance(RoadSegment.geog, point_geog)
+    ).limit(1).first()
+
+    if not nearest:
+        logger.warning(f"No road segments found near ({lat}, {lon})")
+        return None
+
+    logger.info(
+        f"Nearest segment to ({lat}, {lon}): id={nearest.id}, name={nearest.name!r}, "
+        f"city={nearest.city!r}, distance={nearest.distance_m:.1f}m"
+    )
+
+    # Fetch all segments for the found street (name + city match).
+    # If the segment has no name, return just that one segment.
+    seg_query = db.query(
+        RoadSegment.id,
+        RoadSegment.osm_id,
+        RoadSegment.name,
+        RoadSegment.road_ref,
+        RoadSegment.road_class,
+        RoadSegment.city,
+        RoadSegment.max_speed,
+        ST_AsGeoJSON(RoadSegment.geog).label('geog_json')
+    )
+
+    if nearest.name is None:
+        seg_query = seg_query.filter(RoadSegment.id == nearest.id)
+    else:
+        seg_query = seg_query.filter(RoadSegment.name == nearest.name)
+        if nearest.city:
+            seg_query = seg_query.filter(RoadSegment.city == nearest.city)
+
+    all_segments = seg_query.all()
+
+    segments_response = []
+    for seg in all_segments:
+        coordinates = parse_geojson_to_coordinates(seg.geog_json)
+        if date_from and date_to:
+            statistics = get_segment_statistics_from_db(db, seg.id, date_from, date_to)
+        else:
+            statistics = get_segment_statistics_alltime_from_db(db, seg.id)
+
+        segments_response.append(RoadSegmentResponse(
+            id=seg.id,
+            osm_id=seg.osm_id,
+            name=seg.name,
+            road_ref=seg.road_ref,
+            road_class=seg.road_class,
+            city=seg.city,
+            max_speed=seg.max_speed,
+            coordinates=coordinates,
+            statistics=statistics
+        ))
+
+    logger.info(f"Loaded {len(segments_response)} segments for street {nearest.name!r} in {nearest.city!r}")
+
+    return NearestStreetResponse(
+        street_name=nearest.name,
+        city=nearest.city,
+        segments=segments_response,
+        total_count=len(segments_response),
+        nearest_segment_id=nearest.id,
+        distance_m=nearest.distance_m
     )
 
