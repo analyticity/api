@@ -237,6 +237,56 @@ class ExampleDataLoader:
         return alerts
 
     @staticmethod
+    def get_event_links(
+        source_type: str = None,
+        target_type: str = None,
+        source_ids: List[int] = None,
+        target_ids: List[int] = None,
+        date_from: datetime = None,
+        date_to: datetime = None
+    ) -> List[Dict[str, Any]]:
+        """Get event links from example data with optional filters"""
+        links = ExampleDataLoader.load_csv("example_event_links.csv")
+
+        if source_type:
+            links = [l for l in links if l.get("source_type") == source_type]
+
+        if target_type:
+            links = [l for l in links if l.get("target_type") == target_type]
+
+        if source_ids:
+            links = [l for l in links if l.get("source_id") in source_ids]
+
+        if target_ids:
+            links = [l for l in links if l.get("target_id") in target_ids]
+
+        if date_from or date_to:
+            if date_from and date_from.tzinfo is None:
+                date_from = date_from.replace(tzinfo=timezone.utc)
+            if date_to and date_to.tzinfo is None:
+                date_to = date_to.replace(tzinfo=timezone.utc)
+
+            filtered = []
+            for link in links:
+                created_at = link.get("created_at")
+                if not created_at:
+                    continue
+                if isinstance(created_at, datetime) and created_at.tzinfo is None:
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                try:
+                    if date_from and created_at < date_from:
+                        continue
+                    if date_to and created_at > date_to:
+                        continue
+                    filtered.append(link)
+                except TypeError:
+                    logger.warning(f"Skipping event_link {link.get('id')} due to datetime comparison error")
+                    continue
+            links = filtered
+
+        return links
+
+    @staticmethod
     def get_restrictions(
         segment_ids: List[int] = None,
         date_from: datetime = None,

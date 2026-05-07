@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   api:
+    build: .
     image: ghcr.io/analyticity/api:latest
     container_name: analyticity-api
     ports:
