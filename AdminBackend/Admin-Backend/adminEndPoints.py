@@ -63,11 +63,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 @router.post("/login")
 async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == form_data.username).first()
+    town = db.query(Town).filter(Town.id == user.town).first()
+
     if not user or not verify_password(form_data.password, user.passwordhash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user.active:
         raise HTTPException(status_code=401, detail="Deactivated account")
+
+    if town:
+        appTown = os.getenv("VITE_APP_CITY")
+        if appTown != town.name:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token = create_token(
         {"sub": user.name, "role": user.admintype},
@@ -152,6 +159,10 @@ async def getTowns(db: Session = Depends(get_db)):
     towns = db.query(Town).all()
     return [{"id": t.id, "name": t.name, "active": t.active, "description": t.description} for t in towns]
 
+@router.get("/getAppTown")
+async def getTowns(db: Session = Depends(get_db)):
+    return os.getenv("VITE_APP_CITY")
+
 @router.post("/getTown")
 async def getTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     town = db.query(Town).filter(Town.name == data.get("town")).first()
@@ -164,8 +175,9 @@ async def getTown(data: dict, current_user: dict = Depends(get_current_user), db
             {"Name": "Name", "Value": town.name, "Show": show.name, "GroupName": ''},
             {"Name": "DbName", "Value": town.dbname, "Show": show.dbname, "GroupName": ''},
             {"Name": "DbUser", "Value": town.dbuser, "Show": show.dbuser, "GroupName": ''},
-            {"Name": "CoverageArea", "Value": to_shape(town.coveragearea).wkt, "Show": show.coveragearea, "GroupName": ''},
+            {"Name": "CoverageArea", "Value": town.coveragearea, "Show": show.coveragearea, "GroupName": ''},
             {"Name": "WazeLink", "Value": town.wazelink, "Show": show.wazelink, "GroupName": ''},
+            {"Name": "UrlLink", "Value": town.urllink, "Show": show.urllink, "GroupName": ''},
             {"Name": "DbHost", "Value": town.dbhost, "Show": show.dbhost, "GroupName": ''},
             {"Name": "DbPortExternal", "Value": town.dbportexternal, "Show": show.dbportexternal, "GroupName": ''},
             {"Name": "DbPortInternal", "Value": town.dbportinternal, "Show": show.dbportinternal, "GroupName": ''},
@@ -202,7 +214,6 @@ async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user)
         return {"error" : "Email"}
     
     AssingedTown = None
-    print(data.get("town"))
     if data.get("town") is not '':
         town = db.query(Town).filter(Town.name == data.get("town")).first()
         AssingedTown = town.id 
@@ -290,6 +301,7 @@ async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user),
     NewTown = Town(
         name=townValues.get("name"),
         wazelink=townValues.get("wazelink"),
+        urllink=townValues.get("urllink"),
         dbhost=townValues.get("dbhost"),
         dbportexternal=townValues.get("dbportexternal"),
         dbportinternal=townValues.get("dbportinternal"),
@@ -298,7 +310,7 @@ async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user),
         dbpassword=townValues.get("dbpassword"),
         description=townValues.get("description"),
         active=str(townValues.get("active")).strip().lower() == "true",
-        coveragearea=from_shape(wkt.loads(townValues.get("coveragearea")), srid=4326),
+        coveragearea=townValues.get("coveragearea"),
         updatedat=func.now(),
     )
     try:
@@ -332,6 +344,7 @@ async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user),
         dbuser = str(townValues.get("showdbuser")).strip().lower() == "true",
         coveragearea = str(townValues.get("showcoveragearea")).strip().lower() == "true",
         wazelink = str(townValues.get("showwazelink")).strip().lower() == "true",
+        urllink = str(townValues.get("showurllink")).strip().lower() == "true",
         dbhost = str(townValues.get("showdbhost")).strip().lower() == "true",
         dbportexternal = str(townValues.get("showdbportexternal")).strip().lower() == "true",
         dbportinternal = str(townValues.get("showdbportinternal")).strip().lower() == "true",
@@ -371,6 +384,7 @@ async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user)
 
     editTown.name = townValues.get("name")
     editTown.wazelink = townValues.get("wazelink")
+    editTown.urllink = townValues.get("urllink")
     editTown.dbhost = townValues.get("dbhost")
     editTown.dbportexternal = townValues.get("dbportexternal")
     editTown.dbportinternal = townValues.get("dbportinternal")
@@ -379,7 +393,7 @@ async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user)
     editTown.dbpassword = townValues.get("dbpassword")
     editTown.description = townValues.get("description")
     editTown.active = str(townValues.get("active")).strip().lower() == "true"
-    editTown.coveragearea =  from_shape(wkt.loads(townValues.get("coveragearea")), srid=4326)
+    editTown.coveragearea = townValues.get("coveragearea")
     editTown.updatedat = func.now()
 
     show.name = str(townValues.get("showname")).strip().lower() == "true"
@@ -387,6 +401,7 @@ async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user)
     show.dbuser = str(townValues.get("showdbuser")).strip().lower() == "true"
     show.coveragearea = str(townValues.get("showcoveragearea")).strip().lower() == "true"
     show.wazelink = str(townValues.get("showwazelink")).strip().lower() == "true"
+    show.urllink = str(townValues.get("showurllink")).strip().lower() == "true"
     show.dbhost = str(townValues.get("showdbhost")).strip().lower() == "true"
     show.dbportexternal = str(townValues.get("showdbportexternal")).strip().lower() == "true"
     show.dbportinternal = str(townValues.get("showdbportinternal")).strip().lower() == "true"
@@ -431,10 +446,7 @@ async def DeleteTown(data: dict, current_user: dict = Depends(get_current_user),
 async def GetCoverageArea(data: dict, db: Session = Depends(get_db)):
     town = db.query(Town).filter(Town.name == data.get("name")).first()
     if town:
-        print(town)
-        return {"coveragearea": to_shape(town.coveragearea).wkt}
-    else:
-        print(data.get("name"))
+        return {"coveragearea": town.coveragearea}
 
 @router.post("/getTownSettings")
 async def GetTownSettings(data: dict, db: Session = Depends(get_db)):

@@ -5,7 +5,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
-from geoalchemy2 import Geometry
 
 
 Base = declarative_base()
@@ -28,6 +27,7 @@ class Town(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
+    urllink = Column(String, nullable=False)
     wazelink = Column(String, nullable=False)
     dbhost = Column(String, nullable=False)
     dbportexternal = Column(Integer, nullable=False)
@@ -37,7 +37,7 @@ class Town(Base):
     dbpassword = Column(String, nullable=False)
     description = Column(String)
     active = Column(Boolean, default=True)
-    coveragearea = Column(Geometry("POLYGON", srid=4326))
+    coveragearea = Column(String, nullable=False)
     createdat = Column(DateTime(timezone=True), server_default=func.now())
     updatedat = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -50,6 +50,7 @@ class Show(Base):
     dbuser = Column(Boolean, nullable=False)
     coveragearea = Column(Boolean, nullable=False)
     wazelink = Column(Boolean, nullable=False)
+    urllink = Column(Boolean, nullable=False)
     dbhost = Column(Boolean, nullable=False)
     dbportexternal = Column(Boolean, nullable=False)
     dbportinternal = Column(Boolean, nullable=False)
