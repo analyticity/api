@@ -1,8 +1,8 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from modules.map.schema import StreetSegmentsResponse, RoadSegmentByIdResponse, AccidentsResponse, AlertsResponse, JamsResponse, RestrictionsResponse, EventLinksResponse, NearestStreetResponse
-from modules.map.service_db import get_street_segments_from_db, get_road_segment_by_id_from_db, get_accidents_from_db, get_alerts_from_db, get_jams_from_db, get_restrictions_from_db, get_event_links_from_db, get_event_links_by_source_from_db, get_event_links_by_target_from_db, get_nearest_street_from_db
+from modules.map.schema import StreetSegmentsResponse, RoadSegmentByIdResponse, AccidentsResponse, AlertsResponse, JamsResponse, RestrictionsResponse, EventLinksResponse, NearestStreetResponse, StreetsResponse, StreetsEnrichedResponse
+from modules.map.service_db import get_street_segments_from_db, get_road_segment_by_id_from_db, get_accidents_from_db, get_alerts_from_db, get_jams_from_db, get_restrictions_from_db, get_event_links_from_db, get_event_links_by_source_from_db, get_event_links_by_target_from_db, get_nearest_street_from_db, get_streets_from_db, get_streets_enriched_from_db
 from modules.map.service_examples import (
     get_street_segments_from_example,
     get_road_segment_by_id_from_example,
@@ -14,6 +14,8 @@ from modules.map.service_examples import (
     get_event_links_by_source_from_example,
     get_event_links_by_target_from_example,
     get_nearest_street_from_example,
+    get_streets_from_example,
+    get_streets_enriched_from_example,
 )
 from core.logging_config import get_logger
 from datetime import datetime
@@ -181,6 +183,34 @@ def get_event_links_by_source(
     except Exception as e:
         logger.error(f"[event-links-by-source] DB query failed: {e}. Falling back to example data", exc_info=True)
         return get_event_links_by_source_from_example(source_ids, source_type, date_from, date_to)
+
+
+def get_streets(db: Optional[Session]) -> StreetsResponse:
+    """Get distinct streets (name + city) with automatic fallback."""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_streets_from_example()
+
+    try:
+        return get_streets_from_db(db)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_streets_from_example()
+
+
+def get_streets_enriched(db: Optional[Session]) -> StreetsEnrichedResponse:
+    """Get distinct streets with event statistics, with automatic fallback."""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_streets_enriched_from_example()
+
+    try:
+        return get_streets_enriched_from_db(db)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_streets_enriched_from_example()
 
 
 def get_nearest_street(

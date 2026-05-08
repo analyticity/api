@@ -37,6 +37,57 @@ Coordinate = List[float]
 Polyline = List[Coordinate]
 
 
+class StreetItem(BaseModel):
+    name: Optional[str] = None
+    city: Optional[str] = None
+
+
+class StreetsResponse(BaseModel):
+    streets: List[StreetItem]
+    total_count: int
+
+
+class AccidentTypeCount(BaseModel):
+    accident_type: str
+    count: int
+
+
+class AccidentCauseCount(BaseModel):
+    cause: str
+    count: int
+
+
+class AlertTypeCount(BaseModel):
+    alert_type: str
+    count: int
+
+
+class StreetEnrichedItem(BaseModel):
+    name: Optional[str] = None
+    city: Optional[str] = None
+    # jams
+    jams_count: int = 0
+    jams_total_length_m: float = 0.0
+    jams_avg_speed_kmh: Optional[float] = None
+    jams_max_speed_kmh: Optional[float] = None
+    jams_min_speed_kmh: Optional[float] = None
+    # accidents
+    accidents_count: int = 0
+    accidents_total_damage_czk: Optional[int] = None
+    accidents_by_type: List[AccidentTypeCount] = []
+    accidents_by_cause: List[AccidentCauseCount] = []
+    # restrictions
+    restrictions_count: int = 0
+    # alerts
+    alerts_count: int = 0
+    alerts_by_type: List[AlertTypeCount] = []
+
+
+class StreetsEnrichedResponse(BaseModel):
+    streets: List[StreetEnrichedItem]
+    total_count: int
+
+
 class SegmentStatistics(BaseModel):
     jams_count: int = Field(0, description="Number of traffic jams")
     accidents_count: int = Field(0, description="Number of accidents")

@@ -21,6 +21,8 @@ from modules.map.schema import (
     EventLinksByTargetRequest,
     NearestStreetRequest,
     NearestStreetResponse,
+    StreetsResponse,
+    StreetsEnrichedResponse,
 )
 from modules.map.service import (
     get_street_segments,
@@ -33,12 +35,114 @@ from modules.map.service import (
     get_event_links_by_source,
     get_event_links_by_target,
     get_nearest_street,
+    get_streets,
+    get_streets_enriched,
 )
 from db.connection_to_db import get_db
 from core.logging_config import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+
+@router.get(
+    "/streets",
+    response_model=StreetsResponse,
+    summary="Get list of unique streets",
+    description="""
+    Returns all distinct street names together with their city from the road_segments table.
+    No geometry is included.
+
+    Results are sorted by city, then by street name.
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully retrieved street list",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "streets": [
+                            {"name": "Jihlavská", "city": "Brno"},
+                            {"name": "Kounicova", "city": "Brno"}
+                        ],
+                        "total_count": 2
+                    }
+                }
+            }
+        },
+        500: {"description": "Internal server error"}
+    }
+)
+def get_streets_endpoint(
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> StreetsResponse:
+    logger.info("Streets list request")
+
+    try:
+        result = get_streets(db=db)
+        logger.info(f"Returning {result.total_count} distinct streets")
+        return result
+    except Exception as e:
+        logger.error(f"Error processing streets request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve streets: {str(e)}"
+        )
+
+
+@router.get(
+    "/streets/enriched",
+    response_model=StreetsEnrichedResponse,
+    summary="Get unique streets with event statistics",
+    description="""
+    Returns all distinct street names with their city and aggregated event counts
+    (traffic jams, accidents, restrictions) across all segments of each street.
+    No geometry is included.
+
+    Results are sorted by city, then by street name.
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully retrieved enriched street list",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "streets": [
+                            {
+                                "name": "Jihlavská",
+                                "city": "Brno",
+                                "jams_count": 12,
+                                "accidents_count": 3,
+                                "restrictions_count": 1
+                            }
+                        ],
+                        "total_count": 1
+                    }
+                }
+            }
+        },
+        500: {"description": "Internal server error"}
+    }
+)
+def get_streets_enriched_endpoint(
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> StreetsEnrichedResponse:
+    logger.info("Enriched streets list request")
+
+    try:
+        result = get_streets_enriched(db=db)
+        logger.info(f"Returning {result.total_count} enriched streets")
+        return result
+    except Exception as e:
+        logger.error(f"Error processing enriched streets request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve enriched streets: {str(e)}"
+        )
 
 
 @router.post(
