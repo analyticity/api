@@ -157,7 +157,7 @@ async def getUser(data: dict, current_user: dict = Depends(get_current_user), db
 @router.get("/getTowns")
 async def getTowns(db: Session = Depends(get_db)):
     towns = db.query(Town).all()
-    return [{"id": t.id, "name": t.name, "active": t.active, "description": t.description} for t in towns]
+    return [{"id": t.id, "name": t.name, "active": t.active, "description": t.description, "urllink": t.urllink} for t in towns]
 
 @router.get("/getAppTown")
 async def getTowns(db: Session = Depends(get_db)):
