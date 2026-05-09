@@ -13,7 +13,10 @@ from modules.map.schema import (
     JamResponse,
     JamsResponse,
     RestrictionResponse,
-    RestrictionsResponse
+    RestrictionsResponse,
+    EventLinkResponse,
+    EventLinksResponse,
+    NearestStreetResponse,
 )
 from core.example_data import ExampleDataLoader
 from core.logging_config import get_logger
@@ -161,12 +164,18 @@ def get_accidents_from_example(
             AccidentResponse(
                 id=accident.get("id"),
                 event_time=accident.get("event_time"),
+                ingested_at=accident.get("ingested_at"),
+                first_seen=accident.get("first_seen"),
+                last_seen=accident.get("last_seen"),
                 location=location,
                 city=accident.get("city"),
                 street_name=accident.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=accident.get("road_type_code"),
                 accident_type=accident.get("accident_type"),
                 accident_subtype=accident.get("accident_subtype"),
+                cause_primary=accident.get("cause_primary"),
+                cause_secondary=accident.get("cause_secondary"),
                 severity=accident.get("severity"),
                 fatalities_count=accident.get("fatalities_count"),
                 serious_injuries=accident.get("serious_injuries"),
@@ -174,11 +183,16 @@ def get_accidents_from_example(
                 persons_involved=accident.get("persons_involved"),
                 vehicles_involved=accident.get("vehicles_involved"),
                 damage_czk=accident.get("damage_czk"),
+                damage_category=accident.get("damage_category"),
                 weather_condition=accident.get("weather_condition"),
                 road_surface=accident.get("road_surface"),
                 light_condition=accident.get("light_condition"),
+                road_condition=accident.get("road_condition"),
+                vehicle_types=accident.get("vehicle_types"),
                 alcohol_involved=accident.get("alcohol_involved"),
                 drugs_involved=accident.get("drugs_involved"),
+                alcohol_level=accident.get("alcohol_level"),
+                quality_score=accident.get("quality_score"),
                 segment_id=accident.get("segment_id")
             )
         )
@@ -213,17 +227,20 @@ def get_alerts_from_example(
         alerts_response.append(
             AlertResponse(
                 id=alert.get("id"),
+                ingested_at=alert.get("ingested_at"),
                 first_seen=alert.get("first_seen"),
                 last_seen=alert.get("last_seen"),
                 location=location,
                 city=alert.get("city"),
                 street_name=alert.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=alert.get("road_type_code"),
                 alert_type=alert.get("alert_type"),
                 alert_subtype=alert.get("alert_subtype"),
                 severity=alert.get("severity"),
                 description=alert.get("description"),
                 active=alert.get("active"),
+                quality_score=alert.get("quality_score"),
                 segment_id=alert.get("segment_id")
             )
         )
@@ -259,17 +276,20 @@ def get_jams_from_example(
             JamResponse(
                 id=jam.get("id"),
                 event_time=jam.get("event_time"),
+                ingested_at=jam.get("ingested_at"),
                 first_seen=jam.get("first_seen"),
                 last_seen=jam.get("last_seen"),
                 jam_line=jam_line,
                 city=jam.get("city"),
                 street_name=jam.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=jam.get("road_type_code"),
                 delay_seconds=jam.get("delay_seconds"),
                 length_m=jam.get("length_m"),
                 speed_kmh=jam.get("speed_kmh"),
                 speed_normal_kmh=jam.get("speed_normal_kmh"),
                 severity=jam.get("severity"),
+                quality_score=jam.get("quality_score"),
                 segment_id=jam.get("segment_id")
             )
         )
@@ -305,7 +325,9 @@ def get_restrictions_from_example(
         restrictions_response.append(
             RestrictionResponse(
                 id=restriction.get("id"),
+                external_version=restriction.get("external_version"),
                 event_time=restriction.get("event_time"),
+                ingested_at=restriction.get("ingested_at"),
                 valid_from=restriction.get("valid_from"),
                 valid_to=restriction.get("valid_to"),
                 first_seen=restriction.get("first_seen"),
@@ -315,14 +337,19 @@ def get_restrictions_from_example(
                 city=restriction.get("city"),
                 street_name=restriction.get("street_name"),
                 road_number=str(road_number) if road_number is not None and road_number != "" else None,
+                road_type_code=restriction.get("road_type_code"),
+                km_from=restriction.get("km_from"),
+                km_to=restriction.get("km_to"),
                 direction=restriction.get("direction"),
                 restriction_type=restriction.get("restriction_type"),
                 restriction_subtype=restriction.get("restriction_subtype"),
                 urgency=restriction.get("urgency"),
+                probability=restriction.get("probability"),
                 severity=restriction.get("severity"),
                 status=restriction.get("status"),
                 max_speed_kmh=restriction.get("max_speed_kmh"),
                 description_cs=restriction.get("description_cs"),
+                quality_score=restriction.get("quality_score"),
                 segment_id=restriction.get("segment_id")
             )
         )
@@ -336,4 +363,148 @@ def get_restrictions_from_example(
         date_to=date_to
     )
 
+
+def _build_event_links_response(links_data, date_from, date_to) -> EventLinksResponse:
+    links_response = [
+        EventLinkResponse(
+            id=link.get("id"),
+            source_type=link.get("source_type"),
+            source_id=link.get("source_id"),
+            target_type=link.get("target_type"),
+            target_id=link.get("target_id"),
+            link_type=link.get("link_type"),
+            confidence=link.get("confidence"),
+            description=link.get("description"),
+            created_at=link.get("created_at")
+        )
+        for link in links_data
+    ]
+    logger.info(f"Loaded {len(links_response)} event links from example data")
+    return EventLinksResponse(
+        event_links=links_response,
+        total_count=len(links_response),
+        date_from=date_from,
+        date_to=date_to
+    )
+
+
+def get_event_links_from_example(
+    source_type: Optional[str],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        source_type=source_type,
+        target_type=target_type,
+        date_from=date_from,
+        date_to=date_to
+    )
+
+    return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_event_links_by_source_from_example(
+    source_ids: List[int],
+    source_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by source_ids from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        source_type=source_type,
+        source_ids=source_ids,
+        date_from=date_from,
+        date_to=date_to
+    )
+    return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_event_links_by_target_from_example(
+    target_ids: List[int],
+    target_type: Optional[str],
+    date_from: datetime,
+    date_to: datetime
+) -> EventLinksResponse:
+    """Get event links filtered by target_ids from example data"""
+
+    links_data = ExampleDataLoader.get_event_links(
+        target_type=target_type,
+        target_ids=target_ids,
+        date_from=date_from,
+        date_to=date_to
+    )
+    return _build_event_links_response(links_data, date_from, date_to)
+
+
+def get_nearest_street_from_example(
+    lat: float,
+    lon: float,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> Optional[NearestStreetResponse]:
+    """Fallback: treat the first example segment's street as the found street."""
+
+    all_segments_data = ExampleDataLoader.get_road_segments(None)
+    if not all_segments_data:
+        logger.warning("No example road segments available for nearest-street fallback")
+        return None
+
+    # Identify the "nearest" street from the first segment
+    nearest = all_segments_data[0]
+    street_name = nearest.get("name")
+    city = nearest.get("city")
+    nearest_id = nearest.get("id")
+
+    # Collect all example segments that share the same street name + city
+    if street_name is None:
+        matching = [nearest]
+    else:
+        matching = [
+            s for s in all_segments_data
+            if s.get("name") == street_name and (city is None or s.get("city") == city)
+        ]
+
+    segments_response = []
+    for seg in matching:
+        seg_id = seg.get("id")
+        coordinates = seg.get("geog")
+        if not coordinates:
+            continue
+
+        if date_from and date_to:
+            statistics = get_segment_statistics_from_example(seg_id, date_from, date_to)
+        else:
+            statistics = SegmentStatistics(
+                jams_count=0,
+                accidents_count=0,
+                alerts_count=0,
+                restrictions_count=0
+            )
+
+        road_ref = seg.get("road_ref")
+        segments_response.append(RoadSegmentResponse(
+            id=seg_id,
+            osm_id=seg.get("osm_id"),
+            name=seg.get("name"),
+            road_ref=str(road_ref) if road_ref is not None else None,
+            road_class=str(seg.get("road_class")),
+            city=seg.get("city"),
+            max_speed=seg.get("max_speed"),
+            coordinates=coordinates,
+            statistics=statistics
+        ))
+
+    logger.info(f"Nearest street fallback: {len(segments_response)} segments for street {street_name!r}")
+    return NearestStreetResponse(
+        street_name=street_name,
+        city=city,
+        segments=segments_response,
+        total_count=len(segments_response),
+        nearest_segment_id=nearest_id,
+        distance_m=0.0
+    )
 

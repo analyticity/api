@@ -9,7 +9,6 @@ class TrafficJam(Base):
 
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     first_seen = Column(DateTime(timezone=True))
     last_seen = Column(DateTime(timezone=True))
@@ -33,7 +32,6 @@ class Accident(Base):
 
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     first_seen = Column(DateTime(timezone=True))
     last_seen = Column(DateTime(timezone=True))
@@ -58,6 +56,7 @@ class Accident(Base):
     road_surface = Column(Text)
     light_condition = Column(Text)
     road_condition = Column(Text)
+    vehicle_types = Column(Text)
     alcohol_involved = Column(Boolean)
     drugs_involved = Column(Boolean)
     alcohol_level = Column(Float)
@@ -95,7 +94,6 @@ class Restriction(Base):
     id = Column(BigInteger, primary_key=True)
     external_ids = Column(JSONB, nullable=False)
     external_version = Column(Integer)
-    event_time = Column(DateTime(timezone=True))
     ingested_at = Column(DateTime(timezone=True), nullable=False)
     valid_from = Column(DateTime(timezone=True))
     valid_to = Column(DateTime(timezone=True))
@@ -122,3 +120,16 @@ class Restriction(Base):
     raw = Column(JSONB, nullable=False)
     segment_id = Column(BigInteger)
 
+
+class EventLink(Base):
+    __tablename__ = "event_links"
+
+    id = Column(BigInteger, primary_key=True)
+    source_type = Column(Text, nullable=False)
+    source_id = Column(BigInteger, nullable=False)
+    target_type = Column(Text, nullable=False)
+    target_id = Column(BigInteger, nullable=False)
+    link_type = Column(Text, nullable=False)
+    confidence = Column(Integer)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True))

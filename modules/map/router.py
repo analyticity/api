@@ -14,9 +14,26 @@ from modules.map.schema import (
     JamsRequest,
     JamsResponse,
     RestrictionsRequest,
-    RestrictionsResponse
+    RestrictionsResponse,
+    EventLinksRequest,
+    EventLinksResponse,
+    EventLinksBySourceRequest,
+    EventLinksByTargetRequest,
+    NearestStreetRequest,
+    NearestStreetResponse,
 )
-from modules.map.service import get_street_segments, get_road_segment_by_id, get_accidents, get_alerts, get_jams, get_restrictions
+from modules.map.service import (
+    get_street_segments,
+    get_road_segment_by_id,
+    get_accidents,
+    get_alerts,
+    get_jams,
+    get_restrictions,
+    get_event_links,
+    get_event_links_by_source,
+    get_event_links_by_target,
+    get_nearest_street,
+)
 from db.connection_to_db import get_db
 from core.logging_config import get_logger
 
@@ -214,6 +231,116 @@ def get_road_segment_by_id_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve road segment: {str(e)}"
+        )
+
+
+@router.post(
+    "/nearest-street",
+    response_model=NearestStreetResponse,
+    summary="Find nearest road segment to a coordinate",
+    description="""
+    Given a geographic coordinate (e.g. from a Leaflet click event):
+    1. Finds the **single nearest** road segment using a PostGIS KNN index scan.
+    2. Reads the street name (and city) from that segment.
+    3. Returns **all** road segments that share that street name+city, each with event statistics.
+
+    If **date_from** and **date_to** are provided, statistics are scoped to that
+    date range; otherwise all-time totals are returned.
+
+    Statistics per segment include:
+    - Number of traffic jams
+    - Number of accidents
+    - Number of alerts
+    - Number of restrictions
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully found street and returned all its segments",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "street_name": "Kounicova",
+                        "city": "Brno",
+                        "nearest_segment_id": 8181,
+                        "distance_m": 14.7,
+                        "total_count": 3,
+                        "segments": [
+                            {
+                                "id": 8181,
+                                "osm_id": 205262250,
+                                "name": "Kounicova",
+                                "road_ref": None,
+                                "road_class": "secondary",
+                                "city": "Brno",
+                                "max_speed": 50,
+                                "coordinates": [[16.608, 49.195], [16.609, 49.196]],
+                                "statistics": {
+                                    "jams_count": 3,
+                                    "accidents_count": 1,
+                                    "alerts_count": 2,
+                                    "restrictions_count": 0
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        404: {"description": "No road segments found in database"},
+        422: {"description": "Validation error in request data"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_nearest_street_endpoint(
+    request: NearestStreetRequest,
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> NearestStreetResponse:
+    """
+    Return the road segment nearest to the given coordinates.
+
+    Args:
+        request: Latitude, longitude, and optional date range for statistics
+        db: Database session (None if unavailable, triggers fallback mode)
+
+    Returns:
+        Nearest road segment with coordinates, metadata, and event statistics
+    """
+
+    logger.info(
+        f"Nearest street request: lat={request.lat}, lon={request.lon}, "
+        f"date_range: {request.date_from} to {request.date_to}"
+    )
+
+    try:
+        result = get_nearest_street(
+            db=db,
+            lat=request.lat,
+            lon=request.lon,
+            date_from=request.date_from,
+            date_to=request.date_to
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No road segments found near the provided coordinates"
+            )
+
+        logger.info(
+            f"Returning {result.total_count} segments for street {result.street_name!r}, "
+            f"nearest_id={result.nearest_segment_id}, distance={result.distance_m:.1f}m"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing nearest street request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to find nearest street: {str(e)}"
         )
 
 
@@ -600,4 +727,186 @@ def get_restrictions_endpoint(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve restrictions: {str(e)}"
+        )
+
+
+@router.post(
+    "/event-links",
+    response_model=EventLinksResponse,
+    summary="Get event links with filters",
+    description="""
+    Retrieve event links that connect events across different tables (alerts, restrictions, traffic jams, etc.).
+
+    Optionally filter by source_type and/or target_type.
+
+    Returns event link information including:
+    - Source event type and ID
+    - Target event type and ID
+    - Link type (e.g. caused_by)
+    - Confidence score
+    - Description of the match
+
+    Links are filtered by created_at within the specified date range.
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {
+            "description": "Successfully retrieved event links",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "event_links": [
+                            {
+                                "id": 10,
+                                "source_type": "alert",
+                                "source_id": 8,
+                                "target_type": "traffic_jam",
+                                "target_id": 283,
+                                "link_type": "caused_by",
+                                "confidence": 64,
+                                "description": "HAZARD_ON_ROAD_POT_HOLE matched jam via spatial",
+                                "created_at": "2026-04-14T14:16:37.067286+00:00"
+                            }
+                        ],
+                        "total_count": 1,
+                        "date_from": "2026-04-01T00:00:00Z",
+                        "date_to": "2026-04-30T23:59:59Z"
+                    }
+                }
+            }
+        },
+        422: {"description": "Validation error in request data"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_event_links_endpoint(
+    request: EventLinksRequest,
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> EventLinksResponse:
+    """
+    Get event links with optional source/target type filters and date range.
+
+    Args:
+        request: Request containing optional source_type, target_type and date range
+        db: Database session (None if unavailable, triggers fallback mode)
+
+    Returns:
+        List of event links with source/target references
+    """
+
+    logger.info(
+        f"Event links request: source_type={request.source_type}, target_type={request.target_type}, "
+        f"date range: {request.date_from} to {request.date_to}"
+    )
+
+    try:
+        result = get_event_links(
+            db=db,
+            source_type=request.source_type,
+            target_type=request.target_type,
+            date_from=request.date_from,
+            date_to=request.date_to
+        )
+
+        logger.info(f"Returning {result.total_count} event links")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error processing event links request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve event links: {str(e)}"
+        )
+
+
+@router.post(
+    "/event-links/by-source",
+    response_model=EventLinksResponse,
+    summary="Get event links by source IDs",
+    description="""
+    Retrieve event links for a given list of source_ids.
+
+    Optionally filter by source_type.
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {"description": "Successfully retrieved event links"},
+        422: {"description": "Validation error in request data"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_event_links_by_source_endpoint(
+    request: EventLinksBySourceRequest,
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> EventLinksResponse:
+    logger.info(
+        f"Event links by source request: source_ids={request.source_ids}, source_type={request.source_type}, "
+        f"date range: {request.date_from} to {request.date_to}"
+    )
+
+    try:
+        result = get_event_links_by_source(
+            db=db,
+            source_ids=request.source_ids,
+            source_type=request.source_type,
+            date_from=request.date_from,
+            date_to=request.date_to
+        )
+
+        logger.info(f"Returning {result.total_count} event links")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error processing event links by source request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve event links: {str(e)}"
+        )
+
+
+@router.post(
+    "/event-links/by-target",
+    response_model=EventLinksResponse,
+    summary="Get event links by target IDs",
+    description="""
+    Retrieve event links for a given list of target_ids.
+
+    Optionally filter by target_type.
+
+    **Fallback mode**: If database is unavailable, returns example data.
+    """,
+    responses={
+        200: {"description": "Successfully retrieved event links"},
+        422: {"description": "Validation error in request data"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_event_links_by_target_endpoint(
+    request: EventLinksByTargetRequest,
+    db: Annotated[Optional[Session], Depends(get_db)]
+) -> EventLinksResponse:
+    logger.info(
+        f"Event links by target request: target_ids={request.target_ids}, target_type={request.target_type}, "
+        f"date range: {request.date_from} to {request.date_to}"
+    )
+
+    try:
+        result = get_event_links_by_target(
+            db=db,
+            target_ids=request.target_ids,
+            target_type=request.target_type,
+            date_from=request.date_from,
+            date_to=request.date_to
+        )
+
+        logger.info(f"Returning {result.total_count} event links")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error processing event links by target request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve event links: {str(e)}"
         )

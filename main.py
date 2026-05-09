@@ -4,6 +4,8 @@ from core.logging_config import setup_logging, get_logger
 from core.middleware import LoggingMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from db.connection_to_db import is_database_available
+from dotenv import load_dotenv
+import os
 
 setup_logging(log_level="INFO")
 logger = get_logger(__name__)
@@ -30,9 +32,14 @@ app = FastAPI(
 
 app.add_middleware(LoggingMiddleware)
 
+load_dotenv()
+origins = [
+    os.getenv("ORIGINS"), #Frontend url
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins, # Frontend URL from .env
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
