@@ -95,10 +95,17 @@ class PostgresClusterRepository(ClusterRepository):
         if len(points) < 3:
             return None
         accident_ids = [p.accident_id for p in points]
+        # Only return the hull when ST_ConvexHull yields a Polygon — for
+        # collinear or coincident points it produces a LineString/Point,
+        # which would not match the POLYGON column type on insert.
         query = text("""
-            SELECT ST_AsText(ST_ConvexHull(ST_Collect(location_geog)))
-            FROM accidents
-            WHERE id = ANY(:ids) AND location_geog IS NOT NULL
+            SELECT ST_AsText(hull)
+            FROM (
+                SELECT ST_ConvexHull(ST_Collect(location_geog)) AS hull
+                FROM accidents
+                WHERE id = ANY(:ids) AND location_geog IS NOT NULL
+            ) h
+            WHERE ST_GeometryType(hull) = 'ST_Polygon'
         """)
         result = await self._session.execute(query, {"ids": accident_ids})
         row = result.fetchone()

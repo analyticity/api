@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     database_url_sync: str = "postgresql+psycopg2://postgres:password@localhost:5432/accidents_db"
 
     # DBSCAN defaults
-    dbscan_eps_meters: float = 100.0
+    dbscan_eps_meters: float = 30.0
     dbscan_min_samples: int = 3
 
     # Road snapping

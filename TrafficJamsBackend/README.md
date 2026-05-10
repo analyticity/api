@@ -49,11 +49,16 @@ Creates `dangerous_road_clusters` and `cluster_accidents`. Safe to re-run.
 
 ### 3 — Load road segments
 
-Downloads the Brno road network from OpenStreetMap and inserts it into the
-`road_segments` table. Run once (or again to refresh OSM data):
+Load from the bundled CSV (fast, no internet needed):
 
 ```bash
-uv run python scripts/update_road_segments.py
+uv run python scripts/update_road_segments.py --csv brno_roads_updated.csv
+```
+
+Or download a fresh snapshot from OpenStreetMap:
+
+```bash
+uv run python scripts/update_road_segments.py --place "Brno, Czechia"
 ```
 
 ---
