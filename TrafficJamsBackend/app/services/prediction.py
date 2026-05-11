@@ -15,11 +15,10 @@ import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 import joblib
-import numpy as np
 import pandas as pd
 
 from app.config import get_settings
@@ -28,14 +27,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Feature column order must match scripts/train_model.py exactly.
+# Post-event attributes (accident_type, cause_primary) are intentionally absent:
+# they are not knowable before an accident and were causing leakage / "unknown"
+# collapse at inference time.
 _CATEGORICAL_FEATURES = [
     "road_type_code",
     "weather_condition",
     "road_surface",
     "light_condition",
     "road_condition",
-    "accident_type",
-    "cause_primary",
 ]
 _NUMERIC_FEATURES = [
     "hour",
@@ -187,8 +187,6 @@ class PredictionService:
         road_surface: Optional[str],
         light_condition: Optional[str],
         road_condition: Optional[str],
-        accident_type: Optional[str],
-        cause_primary: Optional[str],
     ) -> dict:
         """
         Build the feature row from temporal + weather context, run both models,
@@ -232,8 +230,6 @@ class PredictionService:
             "road_surface":      road_surface,
             "light_condition":   light_condition,
             "road_condition":    road_condition,
-            "accident_type":     accident_type or "unknown",
-            "cause_primary":     cause_primary or "unknown",
             "hour":              hour,
             "day_of_week":       day_of_week,
             "month":             month,
@@ -243,8 +239,10 @@ class PredictionService:
         }])
 
         # ── Inference ─────────────────────────────────────────────────────────
+        # Regressor is HistGradientBoostingRegressor with Gamma loss trained
+        # directly on damage_czk — its output is already in CZK.
         danger_prob = float(cls._clf.predict_proba(row)[0][1])
-        expected_damage = float(np.expm1(cls._reg.predict(row)[0]))
+        expected_damage = float(cls._reg.predict(row)[0])
         risk_level = "high" if danger_prob >= 0.6 else "medium" if danger_prob >= 0.3 else "low"
 
         return {
@@ -268,4 +266,85 @@ class PredictionService:
             "risk_level":          risk_level,
             "expected_damage_czk": int(expected_damage),
             "model_trained_at":    cls._metadata.get("trained_at"),
+        }
+
+    @classmethod
+    def predict_scenario(
+        cls,
+        clusters: List[dict],
+        weather_condition: Optional[str],
+        road_surface: Optional[str],
+        light_condition: Optional[str],
+        road_condition: Optional[str],
+        hour: Optional[int],
+        day_of_week: Optional[int],
+        month: Optional[int],
+    ) -> dict:
+        """
+        Score every cluster under a single shared environmental scenario.
+        No Open-Meteo calls are made; missing fields default to 'unknown'.
+        Builds a single DataFrame and runs both pipelines in one batch call.
+        """
+        now = datetime.now(timezone.utc)
+        eff_hour = hour if hour is not None else now.hour
+        eff_dow = day_of_week if day_of_week is not None else now.weekday()
+        eff_month = month if month is not None else now.month
+        is_weekend = int(eff_dow >= 5)
+        is_night = int(eff_hour < 6 or eff_hour >= 22)
+
+        eff_weather = weather_condition or "unknown"
+        eff_surface = road_surface or "unknown"
+        eff_light = light_condition or ("dark" if is_night else "daylight")
+        eff_road_cond = road_condition or "unknown"
+
+        rows = []
+        cluster_ids: List[int] = []
+        for c in clusters:
+            cluster_ids.append(int(c["id"]))
+            rows.append({
+                "road_type_code":    c.get("road_category") or "unknown",
+                "weather_condition": eff_weather,
+                "road_surface":      eff_surface,
+                "light_condition":   eff_light,
+                "road_condition":    eff_road_cond,
+                "hour":              eff_hour,
+                "day_of_week":       eff_dow,
+                "month":             eff_month,
+                "is_weekend":        is_weekend,
+                "is_night":          is_night,
+                "road_number_int":   _parse_road_number(c.get("road_number")),
+            })
+
+        df = pd.DataFrame(rows)
+        probs = cls._clf.predict_proba(df)[:, 1]
+        damages = cls._reg.predict(df)
+
+        items = []
+        for cid, p, d in zip(cluster_ids, probs, damages):
+            risk = "high" if p >= 0.6 else "medium" if p >= 0.3 else "low"
+            items.append({
+                "cluster_id":          cid,
+                "danger_probability":  round(float(p), 4),
+                "risk_level":          risk,
+                "expected_damage_czk": int(d),
+            })
+
+        return {
+            "evaluated_at": now,
+            "model_trained_at": cls._metadata.get("trained_at"),
+            "temporal": {
+                "hour": eff_hour,
+                "day_of_week": eff_dow,
+                "month": eff_month,
+                "is_weekend": bool(is_weekend),
+                "is_night": bool(is_night),
+            },
+            "weather": {
+                "weather_condition": eff_weather,
+                "road_surface":      eff_surface,
+                "light_condition":   eff_light,
+                "road_condition":    eff_road_cond,
+                "source":            "user",
+            },
+            "items": items,
         }

@@ -216,6 +216,8 @@ def get_accidents_from_db(
         ).scalar()
         logger.info(f"[accidents] rows matching street filter only: {street_count}")
 
+    logger.info(f"[accidents] querying DB: streets={street_names}, date_from={date_from}, date_to={date_to}")
+
     query = db.query(Accident).filter(
         Accident.first_seen >= date_from,
         Accident.first_seen <= date_to

@@ -1,8 +1,8 @@
 {
-  "trained_at": "2026-04-11T14:51:54.595198+00:00",
-  "n_train_samples": 200,
-  "n_test_samples": 50,
-  "dbscan_eps_meters": 100.0,
+  "trained_at": "2026-04-25T14:30:20.881533+00:00",
+  "n_train_samples": 18895,
+  "n_test_samples": 4724,
+  "dbscan_eps_meters": 30.0,
   "dbscan_min_samples": 3,
   "cv_folds": 5,
   "quick_mode": false,
@@ -12,8 +12,6 @@
     "road_surface",
     "light_condition",
     "road_condition",
-    "accident_type",
-    "cause_primary",
     "hour",
     "day_of_week",
     "month",
@@ -24,107 +22,108 @@
   "classifier": {
     "best_params": {
       "model__max_depth": 8,
-      "model__min_samples_leaf": 3,
-      "model__n_estimators": 100
+      "model__min_samples_leaf": 10,
+      "model__n_estimators": 300
     },
-    "cv_roc_auc_mean": NaN,
-    "cv_roc_auc_std": NaN,
-    "test_roc_auc": 0.3911,
-    "test_avg_precision": 0.0932,
+    "cv_roc_auc_mean": 0.6447,
+    "cv_roc_auc_std": 0.0148,
+    "test_roc_auc": 0.5849,
+    "test_avg_precision": 0.7528,
     "feature_importances": [
       {
-        "feature": "day_of_week",
-        "importance": 0.230691
-      },
-      {
-        "feature": "hour",
-        "importance": 0.124007
-      },
-      {
         "feature": "road_type_code",
-        "importance": 0.122018
-      },
-      {
-        "feature": "cause_primary",
-        "importance": 0.109265
+        "importance": 0.637862
       },
       {
         "feature": "light_condition",
-        "importance": 0.107142
+        "importance": 0.089424
       },
       {
-        "feature": "month",
-        "importance": 0.088469
-      },
-      {
-        "feature": "accident_type",
-        "importance": 0.083331
-      },
-      {
-        "feature": "road_surface",
-        "importance": 0.041917
-      },
-      {
-        "feature": "is_weekend",
-        "importance": 0.040074
+        "feature": "hour",
+        "importance": 0.057813
       },
       {
         "feature": "road_number_int",
-        "importance": 0.024203
+        "importance": 0.050756
+      },
+      {
+        "feature": "month",
+        "importance": 0.042221
+      },
+      {
+        "feature": "road_surface",
+        "importance": 0.037893
+      },
+      {
+        "feature": "day_of_week",
+        "importance": 0.032204
+      },
+      {
+        "feature": "weather_condition",
+        "importance": 0.016288
+      },
+      {
+        "feature": "is_night",
+        "importance": 0.014692
+      },
+      {
+        "feature": "road_condition",
+        "importance": 0.013283
       }
     ]
   },
   "regressor": {
     "best_params": {
-      "model__max_depth": 8,
-      "model__min_samples_leaf": 10,
-      "model__n_estimators": 200
+      "model__learning_rate": 0.05,
+      "model__max_iter": 200,
+      "model__max_leaf_nodes": 31,
+      "model__min_samples_leaf": 10
     },
-    "cv_mae_log_mean": 1.2933,
-    "cv_mae_log_std": 0.2111,
-    "test_mae_czk": 63873.04,
-    "test_rmse_czk": 142248.98,
-    "test_r2_log": 0.3292,
+    "cv_mae_czk_mean": 4310.57,
+    "cv_mae_czk_std": 7693.08,
+    "test_mae_czk": 60123.68,
+    "test_rmse_czk": 209612.26,
+    "test_r2": -0.0877,
     "feature_importances": [
       {
-        "feature": "accident_type",
-        "importance": 0.644699
-      },
-      {
-        "feature": "cause_primary",
-        "importance": 0.169174
-      },
-      {
         "feature": "hour",
-        "importance": 0.106586
-      },
-      {
-        "feature": "day_of_week",
-        "importance": 0.035336
-      },
-      {
-        "feature": "light_condition",
-        "importance": 0.026549
-      },
-      {
-        "feature": "month",
-        "importance": 0.01035
+        "importance": 120.506459
       },
       {
         "feature": "road_type_code",
-        "importance": 0.003165
+        "importance": 64.148533
+      },
+      {
+        "feature": "weather_condition",
+        "importance": 49.366247
+      },
+      {
+        "feature": "light_condition",
+        "importance": 30.017628
+      },
+      {
+        "feature": "road_number_int",
+        "importance": 21.431508
+      },
+      {
+        "feature": "road_condition",
+        "importance": 10.986308
       },
       {
         "feature": "is_night",
-        "importance": 0.00225
-      },
-      {
-        "feature": "road_surface",
-        "importance": 0.001393
+        "importance": 3.939461
       },
       {
         "feature": "is_weekend",
-        "importance": 0.000497
+        "importance": 0.0
+      },
+      {
+        "feature": "day_of_week",
+        "importance": -5.464199
+      },
+      {
+        "feature": "road_surface",
+        "importance": -5.526335
       }
     ]
   }

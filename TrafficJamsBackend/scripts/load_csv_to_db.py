@@ -129,12 +129,93 @@ def _load_accidents(engine, csv_path: str, batch_size: int) -> None:
     log.info("Accidents: %d rows written to DB.", inserted)
 
 
+def _first_list_item(s: str) -> str:
+    """Return the first element of a Python-list-style string ("[a, b]")."""
+    inner = s.strip("[]").split(",", 1)[0].strip()
+    return inner.strip("'\"").strip()
+
+
+def _normalize_int(value):
+    """Coerce a value into an int or None.
+
+    Some rows in brno_roads_updated.csv contain list-like strings such as
+    "[54754873, 332341726]" or "['40', '50']" for segments merged from
+    multiple OSM ways — keep the first value in that case.
+    """
+    if value is None:
+        return None
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return None
+        return int(value)
+    if isinstance(value, int):
+        return value
+    s = str(value).strip()
+    if not s or s.upper() in {"NULL", "NAN"}:
+        return None
+    if s.startswith("["):
+        s = _first_list_item(s)
+        if not s:
+            return None
+    try:
+        return int(float(s))
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_str(value):
+    """Coerce a value into a single string or None.
+
+    Merged-segment rows store list-like strings such as
+    "['Poříčí', 'Opuštěná']" — keep the first name.
+    """
+    if value is None:
+        return None
+    if isinstance(value, float) and value != value:  # NaN
+        return None
+    s = str(value).strip()
+    if not s or s.upper() in {"NULL", "NAN"}:
+        return None
+    if s.startswith("["):
+        s = _first_list_item(s)
+        if not s:
+            return None
+    return s
+
+
 def _load_road_segments(engine, csv_path: str, batch_size: int) -> None:
     log.info("Reading road segments from %s …", csv_path)
     df = pd.read_csv(csv_path, low_memory=False)
-    log.info("  %d rows loaded from CSV.", len(df))
+    raw_count = len(df)
+    log.info("  %d rows loaded from CSV.", raw_count)
 
     df.replace("NULL", None, inplace=True)
+
+    # Coerce numeric columns — handles ints, floats, NaN and list-like strings
+    for int_col in ("osm_id", "max_speed"):
+        if int_col in df.columns:
+            df[int_col] = df[int_col].apply(_normalize_int)
+    # Coerce string columns — collapses list-like values to the first item
+    for str_col in ("name", "road_ref", "road_class", "city"):
+        if str_col in df.columns:
+            df[str_col] = df[str_col].apply(_normalize_str)
+
+    # Drop rows we cannot insert at all (missing osm_id or geometry)
+    if "osm_id" in df.columns:
+        before = len(df)
+        df = df[df["osm_id"].notna()].copy()
+        dropped = before - len(df)
+        if dropped:
+            log.info("  dropped %d rows with invalid/missing osm_id.", dropped)
+    if "geog" in df.columns:
+        before = len(df)
+        df = df[df["geog"].notna() & (df["geog"].astype(str).str.len() > 0)].copy()
+        dropped = before - len(df)
+        if dropped:
+            log.info("  dropped %d rows with missing geometry.", dropped)
+
+    # Final NaN sweep: any remaining numpy NaN must become Python None so
+    # psycopg2 sends NULL instead of 'NaN'::float.
     df = df.astype(object).where(pd.notna(df), other=None)
 
     # The CSV geometry column is named "geog" and contains WKB hex.
@@ -156,7 +237,8 @@ def _load_road_segments(engine, csv_path: str, batch_size: int) -> None:
             inserted += len(batch)
             log.info("  … %d / %d rows inserted.", inserted, len(df))
 
-    log.info("Road segments: %d rows written to DB.", inserted)
+    log.info("Road segments: %d rows written to DB (skipped %d).",
+             inserted, raw_count - inserted)
 
 
 def main() -> None:

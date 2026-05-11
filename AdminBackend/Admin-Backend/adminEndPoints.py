@@ -3,6 +3,8 @@
 #########################
 
 from datetime import timedelta
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from utils import verify_password, hash_password, create_token
@@ -20,6 +22,7 @@ import jwt
 import secrets
 import string
 
+from zoneinfo import ZoneInfo
 
 router = APIRouter()
 
@@ -51,21 +54,27 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         return user
-    except JWTError:
+    except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-@router.get("/test")
-async def test():
-    return {"token": "TEST"}
-
+#######################################
+#Authentication routes
+#######################################
 @router.post("/login")
 async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == form_data.username).first()
+    town = db.query(Town).filter(Town.id == user.town).first()
+
     if not user or not verify_password(form_data.password, user.passwordhash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     if not user.active:
         raise HTTPException(status_code=401, detail="Deactivated account")
+
+    if town:
+        appTown = os.getenv("VITE_APP_CITY")
+        if appTown != town.name:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
 
     access_token = create_token(
         {"sub": user.name, "role": user.admintype},
@@ -119,13 +128,16 @@ async def refresh(request: Request, response: Response):
     except Exception as e:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+#######################################
+#Get User/Town list
+#######################################
 @router.get("/getUsers")
 async def getUsers(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     users = db.query(User).all()
     return [{"name": u.name} for u in users]
 
 @router.post("/getUser")
-async def getUsers(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def getUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == data.get("user")).first()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -138,41 +150,48 @@ async def getUsers(data: dict, current_user: dict = Depends(get_current_user), d
             {"Name": "Email", "Value": user.email, "Show": True},
             {"Name": "AdminType", "Value": user.admintype, "Show": False},
             {"Name": "Active", "Value": user.active, "Show": False},
-            {"Name": "CreatedAt", "Value": user.createdat.strftime("%d.%m.%Y %H:%M:%S"), "Show": False},
-            {"Name": "UpdatedAt", "Value": user.updatedat.strftime("%d.%m.%Y %H:%M:%S"), "Show": False},
+            {"Name": "CreatedAt", "Value": user.createdat.astimezone(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"), "Show": False},
+            {"Name": "UpdatedAt", "Value": user.updatedat.astimezone(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"), "Show": False},
             {"Name": "Town", "Value": AssingedTown, "Show": False}]
 
 @router.get("/getTowns")
-async def getUsers(db: Session = Depends(get_db)):
+async def getTowns(db: Session = Depends(get_db)):
     towns = db.query(Town).all()
-    return [{"name": t.name, "active": t.active} for t in towns]
+    return [{"id": t.id, "name": t.name, "active": t.active, "description": t.description, "urllink": t.urllink} for t in towns]
+
+@router.get("/getAppTown")
+async def getTowns(db: Session = Depends(get_db)):
+    return os.getenv("VITE_APP_CITY")
 
 @router.post("/getTown")
-async def getUsers(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def getTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     town = db.query(Town).filter(Town.name == data.get("town")).first()
     show = db.query(Show).filter(Show.town == town.id).first()
     settings = db.query(Settings).filter(Settings.town == town.id).all()
-    defaultSettings = db.query(Settings).filter(Settings.town == None).all()
     if not town:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     returnValues = [{"Name": "Id", "Value": town.id, "Show": False, "GroupName": ''},
             {"Name": "Name", "Value": town.name, "Show": show.name, "GroupName": ''},
             {"Name": "DbName", "Value": town.dbname, "Show": show.dbname, "GroupName": ''},
             {"Name": "DbUser", "Value": town.dbuser, "Show": show.dbuser, "GroupName": ''},
-            {"Name": "CoverageArea", "Value": to_shape(town.coveragearea).wkt, "Show": show.coveragearea, "GroupName": ''},
+            {"Name": "CoverageArea", "Value": town.coveragearea, "Show": show.coveragearea, "GroupName": ''},
             {"Name": "WazeLink", "Value": town.wazelink, "Show": show.wazelink, "GroupName": ''},
+            {"Name": "UrlLink", "Value": town.urllink, "Show": show.urllink, "GroupName": ''},
             {"Name": "DbHost", "Value": town.dbhost, "Show": show.dbhost, "GroupName": ''},
             {"Name": "DbPortExternal", "Value": town.dbportexternal, "Show": show.dbportexternal, "GroupName": ''},
             {"Name": "DbPortInternal", "Value": town.dbportinternal, "Show": show.dbportinternal, "GroupName": ''},
             {"Name": "DbPassword", "Value": town.dbpassword, "Show": show.dbpassword, "GroupName": ''},
             {"Name": "Description", "Value": town.description, "Show": show.description, "GroupName": ''},
             {"Name": "Active", "Value": town.active, "Show": show.active, "GroupName": ''},
-            {"Name": "CreatedAt", "Value": town.createdat.strftime("%d.%m.%Y %H:%M:%S"), "Show": show.createdat, "GroupName": ''},
-            {"Name": "UpdatedAt", "Value": town.updatedat.strftime("%d.%m.%Y %H:%M:%S"), "Show": show.updatedat, "GroupName": ''}]
+            {"Name": "CreatedAt", "Value": town.createdat.astimezone(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"), "Show": show.createdat, "GroupName": ''},
+            {"Name": "UpdatedAt", "Value": town.updatedat.astimezone(ZoneInfo("Europe/Bratislava")).strftime("%d.%m.%Y %H:%M:%S"), "Show": show.updatedat, "GroupName": ''}]
     
+
+    settings.sort(key=lambda x: x.varname)
     for setting in settings:
          returnValues.append({
+            "VarName": setting.varname,
             "Name": setting.settingname, 
             "Value": setting.setting, 
             "Description": setting.description,
@@ -180,18 +199,11 @@ async def getUsers(data: dict, current_user: dict = Depends(get_current_user), d
             "Show": True
         })
     
-    for setting in defaultSettings:
-        if not any(item["Name"] == setting.settingname for item in returnValues):
-            returnValues.append({
-            "Name": setting.settingname, 
-            "Value": setting.setting,
-            "Description": setting.description,
-            "GroupName": setting.groupname,
-            "Show": True
-        })
-    
     return {"data": returnValues}
 
+#######################################
+#User routes
+#######################################
 @router.post("/addNewUser")
 async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == data.get("name")).first()
@@ -201,15 +213,13 @@ async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user)
     if user:
         return {"error" : "Email"}
     
-    alphabet = string.ascii_letters + string.digits
-    password = ''.join(secrets.choice(alphabet) for _ in range(10))
     AssingedTown = None
     if data.get("town") is not '':
         town = db.query(Town).filter(Town.name == data.get("town")).first()
         AssingedTown = town.id 
     newUser = User(
         name=data.get("name"),
-        passwordhash=hash_password(password),
+        passwordhash=hash_password(data.get("password")),
         email=data.get("email"),
         admintype=data.get("admintype"),
         active=str(data.get("active")).strip().lower() == "true",
@@ -224,15 +234,15 @@ async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user)
         return {"error" : "Db"}
 
 @router.post("/editOldUser")
-async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def SaveOldUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     editUser = db.query(User).filter(User.id == data.get("id")).first()
     user = db.query(User).filter(User.name == data.get("name")).first()
     if user:
-        if user.name != editUser.name:
+        if user.id != editUser.id:
             return {"error" : "Name"}
     user = db.query(User).filter(User.email == data.get("email")).first()
     if user:
-        if user.email != editUser.email:
+        if user.id != editUser.id:
             return {"error" : "Email"}
     AssingedTown = None
     if data.get("town") is not None:
@@ -251,24 +261,68 @@ async def SaveNewUser(data: dict, current_user: dict = Depends(get_current_user)
     except Exception as e:
         return {"error" : "Db"}
 
+@router.post("/editPassChange")
+async def EditPassChange(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.name == data.get("UserName")).first()
+    if data.get("New1") != data.get("New2"):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if not user or not verify_password(data.get("Old"), user.passwordhash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    user.passwordhash = hash_password(data.get("New2"))
+
+    try:
+        db.commit()
+        return {"ok" : "ok"} 
+    except Exception as e:
+        return {"error" : "Db"}
+
+@router.post("/changePasswordAdmin")
+async def ChangePasswordAdmin(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.name == data.get("name")).first()
+    user.passwordhash = hash_password(data.get("pass"))
+
+    try:
+        db.commit()
+        return {"ok" : "ok"} 
+    except Exception as e:
+        return {"error" : "Db"}
+
+
+@router.post("/deleteUser")
+async def DeleteUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == data.get("id")).first()
+    try:
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        return {"error" : "Db"}
+
+#######################################
+#Town routes
+#######################################
 @router.post("/addNewTown")
 async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    town = db.query(Town).filter(Town.name == data.get("name")).first()
+    townSettings = data.get('settings');
+    townValues = data.get('townValues')
+
+    town = db.query(Town).filter(Town.name == townValues.get("name")).first()
     if town:
         return {"error" : "Name"}
     
     NewTown = Town(
-        name=data.get("name"),
-        wazelink=data.get("wazelink"),
-        dbhost=data.get("dbhost"),
-        dbportexternal=data.get("dbportexternal"),
-        dbportinternal=data.get("dbportinternal"),
-        dbname=data.get("dbname"),
-        dbuser=data.get("dbuser"),
-        dbpassword=data.get("dbpassword"),
-        description=data.get("description"),
-        active=str(data.get("active")).strip().lower() == "true",
-        #coveragearea=AssingedTown, need to work out map
+        name=townValues.get("name"),
+        wazelink=townValues.get("wazelink"),
+        urllink=townValues.get("urllink"),
+        dbhost=townValues.get("dbhost"),
+        dbportexternal=townValues.get("dbportexternal"),
+        dbportinternal=townValues.get("dbportinternal"),
+        dbname=townValues.get("dbname"),
+        dbuser=townValues.get("dbuser"),
+        dbpassword=townValues.get("dbpassword"),
+        description=townValues.get("description"),
+        active=str(townValues.get("active")).strip().lower() == "true",
+        coveragearea=townValues.get("coveragearea"),
         updatedat=func.now(),
     )
     try:
@@ -278,18 +332,37 @@ async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user),
     except Exception as e:
         return {"error" : "Db"}
 
+    settings = db.query(Settings).filter(Settings.town == None).all()
+    for setting in settings:
+        for townSetting in townSettings:
+            if setting.varname == townSetting.get("VarName"):
+                NewSetting = Settings(
+                    varname = setting.varname,
+                    settingname = setting.settingname,
+                    setting = townSetting.get('Value'),
+                    town = NewTown.id,
+                    description =  setting.description,
+                    groupname =  setting.groupname
+                )
+                try:
+                    db.add(NewSetting)
+                    db.commit()
+                except Exception as e:
+                    return {"error" : "Db"}
+
     NewShow = Show(
-        name = str(data.get("showname")).strip().lower() == "true",
-        dbname = str(data.get("showdbname")).strip().lower() == "true",
-        dbuser = str(data.get("showdbuser")).strip().lower() == "true",
-        coveragearea = str(data.get("showcoveragearea")).strip().lower() == "true",
-        wazelink = str(data.get("showwazelink")).strip().lower() == "true",
-        dbhost = str(data.get("showdbhost")).strip().lower() == "true",
-        dbportexternal = str(data.get("showdbportexternal")).strip().lower() == "true",
-        dbportinternal = str(data.get("showdbportinternal")).strip().lower() == "true",
-        dbpassword = str(data.get("showdbpassword")).strip().lower() == "true",
-        description = str(data.get("showdescription")).strip().lower() == "true",
-        active = str(data.get("showactive")).strip().lower() == "true",
+        name = str(townValues.get("showname")).strip().lower() == "true",
+        dbname = str(townValues.get("showdbname")).strip().lower() == "true",
+        dbuser = str(townValues.get("showdbuser")).strip().lower() == "true",
+        coveragearea = str(townValues.get("showcoveragearea")).strip().lower() == "true",
+        wazelink = str(townValues.get("showwazelink")).strip().lower() == "true",
+        urllink = str(townValues.get("showurllink")).strip().lower() == "true",
+        dbhost = str(townValues.get("showdbhost")).strip().lower() == "true",
+        dbportexternal = str(townValues.get("showdbportexternal")).strip().lower() == "true",
+        dbportinternal = str(townValues.get("showdbportinternal")).strip().lower() == "true",
+        dbpassword = str(townValues.get("showdbpassword")).strip().lower() == "true",
+        description = str(townValues.get("showdescription")).strip().lower() == "true",
+        active = str(townValues.get("showactive")).strip().lower() == "true",
         createdat = False,
         updatedat = False,
         town = NewTown.id,
@@ -304,39 +377,51 @@ async def AddNewTown(data: dict, current_user: dict = Depends(get_current_user),
 
 @router.post("/editOldTown")
 async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    editTown = db.query(Town).filter(Town.id == data.get("id")).first()
-    show = db.query(Show).filter(Show.town == data.get("id")).first()
-    town = db.query(Town).filter(Town.name == data.get("name")).first()
+    settings = data.get('settings');
+    townValues = data.get('townValues')
+
+    editSettings = db.query(Settings).filter(Settings.town == townValues.get("id")).all()
+    for OldSetting in editSettings:
+        for NewSetting in settings:
+            if OldSetting.varname == NewSetting.get("VarName"):
+                OldSetting.setting = NewSetting.get("Value")
+
+    editTown = db.query(Town).filter(Town.id == townValues.get("id")).first()
+    show = db.query(Show).filter(Show.town == townValues.get("id")).first()
+
+    town = db.query(Town).filter(Town.name == townValues.get("name")).first()
     if town:
-        if town.name != editTown.name:
+        if town.id != editTown.id:
             return {"error" : "Name"}
 
-    editTown.name = data.get("name")
-    editTown.wazelink = data.get("wazelink")
-    editTown.dbhost = data.get("dbhost")
-    editTown.dbportexternal = data.get("dbportexternal")
-    editTown.dbportinternal = data.get("dbportinternal")
-    editTown.dbname = data.get("dbname")
-    editTown.dbuser = data.get("dbuser")
-    editTown.dbpassword = data.get("dbpassword")
-    editTown.description = data.get("description")
-    editTown.active = str(data.get("active")).strip().lower() == "true"
-    editTown.coveragearea =  from_shape(wkt.loads(data.get("coveragearea")), srid=4326)
+    editTown.name = townValues.get("name")
+    editTown.wazelink = townValues.get("wazelink")
+    editTown.urllink = townValues.get("urllink")
+    editTown.dbhost = townValues.get("dbhost")
+    editTown.dbportexternal = townValues.get("dbportexternal")
+    editTown.dbportinternal = townValues.get("dbportinternal")
+    editTown.dbname = townValues.get("dbname")
+    editTown.dbuser = townValues.get("dbuser")
+    editTown.dbpassword = townValues.get("dbpassword")
+    editTown.description = townValues.get("description")
+    editTown.active = str(townValues.get("active")).strip().lower() == "true"
+    editTown.coveragearea = townValues.get("coveragearea")
     editTown.updatedat = func.now()
 
-    show.name = str(data.get("showname")).strip().lower() == "true"
-    show.dbname = str(data.get("showdbname")).strip().lower() == "true"
-    show.dbuser = str(data.get("showdbuser")).strip().lower() == "true"
-    show.coveragearea = str(data.get("showcoveragearea")).strip().lower() == "true"
-    show.wazelink = str(data.get("showwazelink")).strip().lower() == "true"
-    show.dbhost = str(data.get("showdbhost")).strip().lower() == "true"
-    show.dbportexternal = str(data.get("showdbportexternal")).strip().lower() == "true"
-    show.dbportinternal = str(data.get("showdbportinternal")).strip().lower() == "true"
-    show.dbpassword = str(data.get("showdbpassword")).strip().lower() == "true"
-    show.description = str(data.get("showdescription")).strip().lower() == "true"
-    show.active = str(data.get("showactive")).strip().lower() == "true"
-    show.createdat = str(data.get("showcreatedat")).strip().lower() == "true"
-    show.updatedat = str(data.get("showupdatedat")).strip().lower() == "true"
+    show.name = str(townValues.get("showname")).strip().lower() == "true"
+    show.dbname = str(townValues.get("showdbname")).strip().lower() == "true"
+    show.dbuser = str(townValues.get("showdbuser")).strip().lower() == "true"
+    show.coveragearea = str(townValues.get("showcoveragearea")).strip().lower() == "true"
+    show.wazelink = str(townValues.get("showwazelink")).strip().lower() == "true"
+    show.urllink = str(townValues.get("showurllink")).strip().lower() == "true"
+    show.dbhost = str(townValues.get("showdbhost")).strip().lower() == "true"
+    show.dbportexternal = str(townValues.get("showdbportexternal")).strip().lower() == "true"
+    show.dbportinternal = str(townValues.get("showdbportinternal")).strip().lower() == "true"
+    show.dbpassword = str(townValues.get("showdbpassword")).strip().lower() == "true"
+    show.description = str(townValues.get("showdescription")).strip().lower() == "true"
+    show.active = str(townValues.get("showactive")).strip().lower() == "true"
+    show.createdat = str(townValues.get("showcreatedat")).strip().lower() == "true"
+    show.updatedat = str(townValues.get("showupdatedat")).strip().lower() == "true"
 
     try:
         db.commit()
@@ -344,19 +429,36 @@ async def EditOldTown(data: dict, current_user: dict = Depends(get_current_user)
     except Exception as e:
         return {"error" : "Db"}
 
-@router.get("/getSettings")
-async def GetSettings(db: Session = Depends(get_db)):
-    settings = db.query(Settings).filter(Settings.town == None).all()
-    settingsData = [
-        {
-            "settingname": setting.settingname,
-            "setting": setting.setting,
-            "description": setting.description,
-            "groupName": setting.groupname,
-        }
-        for setting in settings
-    ]
-    return {"settings": settingsData}
+@router.post("/deleteTown")
+async def DeleteTown(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    town = db.query(Town).filter(Town.id == data.get("id")).first()
+    show = db.query(Show).filter(Show.town == data.get("id")).first()
+    settings = db.query(Settings).filter(Settings.town == data.get("id")).all()
+
+    for setting in settings:
+        try:
+            db.delete(setting)
+            db.commit()
+        except Exception as e:
+            return {"error" : "Db"}
+
+    try:
+        db.delete(show)
+        db.commit()
+    except Exception as e:
+        return {"error" : "Db"}
+
+    try:
+        db.delete(town)
+        db.commit()
+    except Exception as e:
+        return {"error" : "Db"}
+
+@router.post("/getCoverageArea")
+async def GetCoverageArea(data: dict, db: Session = Depends(get_db)):
+    town = db.query(Town).filter(Town.name == data.get("name")).first()
+    if town:
+        return {"coveragearea": town.coveragearea}
 
 @router.post("/getTownSettings")
 async def GetTownSettings(data: dict, db: Session = Depends(get_db)):
@@ -365,6 +467,7 @@ async def GetTownSettings(data: dict, db: Session = Depends(get_db)):
         settings = db.query(Settings).filter(Settings.town.is_(None)).all()
         settingsData = [
             {
+                "varname": setting.varname,
                 "settingname": setting.settingname,
                 "setting": setting.setting,
                 "description": setting.description,
@@ -372,38 +475,119 @@ async def GetTownSettings(data: dict, db: Session = Depends(get_db)):
             }
             for setting in settings
         ]
+        settingsData.sort(key=lambda x: x["varname"])
         return {"settings": settingsData}
     else:
-        defaultsettings = db.query(Settings).filter(Settings.town.is_(None)).all()
         settings = db.query(Settings).filter(Settings.town == town.id).all()
-        townDict = {s.settingname: s.setting for s in settings}
-
         mergedSettings = []
-        for default in defaultsettings:
-            value = townDict.get(default.settingname, default.setting)
-            
+        for default in settings:
             mergedSettings.append({
+                "varname": default.varname,
                 "settingname": default.settingname,
-                "setting": value,
+                "setting": default.setting,
                 "description": default.description,
                 "groupName": default.groupname,
             })
+            mergedSettings.sort(key=lambda x: x["varname"])
         return {"settings": mergedSettings, 'id': town.id}
 
+#######################################
+#Default settings routes
+#######################################
+@router.get("/getSettings")
+async def GetSettings(db: Session = Depends(get_db)):
+    settings = db.query(Settings).filter(Settings.town == None).all()
+    settingsData = [
+        {
+            "id": setting.id,
+            "varname": setting.varname,
+            "settingname": setting.settingname,
+            "setting": setting.setting,
+            "description": setting.description,
+            "groupName": setting.groupname,
+        }
+        for setting in settings
+    ]
+    settingsData.sort(key=lambda x: x["varname"])
+    return {"settings": settingsData}
 
 @router.post("/SaveSettings")
 async def SaveSettings(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    setting = db.query(Settings).filter(Settings.id == data.get("Id")).first()
+    allsettings = db.query(Settings).filter(Settings.varname == setting.varname).all()
+
+    defaultsettings = db.query(Settings).filter(Settings.town == None).all()
+    for defsetting in defaultsettings:
+        if defsetting.varname == setting.varname and defsetting.id != setting.id:
+            return {"error" : "Name"}    
+
+    setting.settingname = data.get("Name")
+    setting.setting = data.get("Value")
+    setting.varname = data.get("VarName")
+    setting.description = data.get("AllDescription")
+    setting.groupname = data.get("AllGroupName")
+
+    for allsetting in allsettings:
+        allsetting.settingname = data.get("Name")
+        allsetting.varname = data.get("VarName")
+        allsetting.description = data.get("AllDescription")
+        allsetting.groupname = data.get("AllGroupName")
+        
+    try:
+        db.commit()
+    except Exception as e:
+        return {"error" : "Db"}
+
+
     return {'test': 'test'}
 
 @router.post("/saveNewSetting") #Add new thins in settings too
 async def SaveNewSetting(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     NewSetting = Settings(
-        settingname = data.get('name'),
-        setting = data.get('value'),
+        varname = data.get('VarName'),
+        settingname = data.get('Name'),
+        setting = data.get('Value'),
+        town = None,
+        description =  data.get('AllDescription'),
+        groupname =  data.get('AllGroupName')
     )
+
+    settings = db.query(Settings).filter(Settings.town == None).all()
+    for setting in settings:
+        if setting.varname == NewSetting.varname:
+            return {"error" : "Name"}
+
     try:
         db.add(NewSetting)
-        db.commit()       
-        return {"ok" : "ok"}  
+        db.commit() 
     except  Exception as e:
         return {"error" : "Db"}
+
+    towns = db.query(Town).all()
+    for town in towns:
+        NewSetting = Settings(
+            varname = data.get('VarName'),
+            settingname = data.get('Name'),
+            setting = data.get('Value'),
+            town = town.id,
+            description =  data.get('AllDescription'),
+            groupname =  data.get('AllGroupName')
+        )
+        try:
+            db.add(NewSetting)
+            db.commit()
+        except  Exception as e:
+            return {"error" : "Db"}
+
+    return {'ok': 'ok'}
+
+@router.post("/deleteSetting") #Add new thins in settings too
+async def DeleteSetting(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    settings = db.query(Settings).filter(Settings.varname == data.get("VarName")).all()
+
+    for setting in settings:
+        try:
+            db.delete(setting)
+            db.commit()
+        except Exception as e:
+            return {"error" : "Db"}
