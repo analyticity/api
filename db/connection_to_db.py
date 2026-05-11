@@ -11,7 +11,7 @@ load_dotenv()
 logger = get_logger(__name__)
 
 DB_HOST = os.getenv("POSTGRES_HOST_BRNO", os.getenv("DB_HOST", "localhost"))
-DB_PORT = int(os.getenv("POSTGRES_PORT_BRNO", os.getenv("DB_PORT", "5433")))
+DB_PORT = int(os.getenv("POSTGRES_PORT_BRNO", os.getenv("DB_PORT", "5432")))
 DB_NAME = os.getenv("POSTGRES_DB_BRNO")
 DB_USER = os.getenv("POSTGRES_USER_BRNO")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD_BRNO")

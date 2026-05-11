@@ -1,14 +1,14 @@
 ### Base URL variable
-@baseUrl = http://localhost:8000
+@baseUrl = http://localhost:8002
 
 ### POST /api/clusters/run — run DBSCAN with default params (CSV data source)
 POST {{baseUrl}}/api/clusters/run
 Content-Type: application/json
 
 {
-  "eps_meters": 100.0,
+  "eps_meters": 30.0,
   "min_samples": 3,
-  "replace_existing": false
+  "replace_existing": true
 }
 
 ###
@@ -44,6 +44,7 @@ GET {{baseUrl}}/api/clusters
 
 ###
 
+@clusterId = 1
 ### GET /api/clusters/{id} — get cluster detail
 GET {{baseUrl}}/api/clusters/{{clusterId}}
 
