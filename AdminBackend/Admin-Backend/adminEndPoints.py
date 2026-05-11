@@ -262,7 +262,7 @@ async def SaveOldUser(data: dict, current_user: dict = Depends(get_current_user)
         return {"error" : "Db"}
 
 @router.post("/editPassChange")
-async def editPassChange(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def EditPassChange(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.name == data.get("UserName")).first()
     if data.get("New1") != data.get("New2"):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -276,6 +276,18 @@ async def editPassChange(data: dict, current_user: dict = Depends(get_current_us
         return {"ok" : "ok"} 
     except Exception as e:
         return {"error" : "Db"}
+
+@router.post("/changePasswordAdmin")
+async def ChangePasswordAdmin(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.name == data.get("name")).first()
+    user.passwordhash = hash_password(data.get("pass"))
+
+    try:
+        db.commit()
+        return {"ok" : "ok"} 
+    except Exception as e:
+        return {"error" : "Db"}
+
 
 @router.post("/deleteUser")
 async def DeleteUser(data: dict, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
