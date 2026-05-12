@@ -22,6 +22,13 @@ from modules.map.schema import (
     EventLinkResponse,
     EventLinksResponse,
     NearestStreetResponse,
+    StreetItem,
+    StreetsResponse,
+    StreetEnrichedItem,
+    StreetsEnrichedResponse,
+    AccidentTypeCount,
+    AccidentCauseCount,
+    AlertTypeCount,
     Polyline
 )
 from core.logging_config import get_logger
@@ -781,4 +788,214 @@ def get_nearest_street_from_db(
         nearest_segment_id=nearest.id,
         distance_m=nearest.distance_m
     )
+
+
+def get_streets_from_db(db: Session) -> StreetsResponse:
+    """Return distinct (name, city) pairs from road_segments, sorted by city then name."""
+
+    rows = (
+        db.query(RoadSegment.name, RoadSegment.city)
+        .filter(RoadSegment.name.isnot(None))
+        .distinct()
+        .order_by(RoadSegment.city, RoadSegment.name)
+        .all()
+    )
+
+    streets = [StreetItem(name=r.name, city=r.city) for r in rows]
+    logger.info(f"Loaded {len(streets)} distinct streets from database")
+    return StreetsResponse(streets=streets, total_count=len(streets))
+
+
+def get_streets_enriched_from_db(db: Session) -> StreetsEnrichedResponse:
+    """
+    Return distinct (name, city) pairs with aggregated statistics.
+    Uses separate queries per event type to avoid cartesian-product inflation
+    from multi-table outerjoin, then merges results in Python.
+    """
+
+    # ── 1. Base street list ────────────────────────────────────────────────
+    street_rows = (
+        db.query(RoadSegment.name, RoadSegment.city)
+        .filter(RoadSegment.name.isnot(None))
+        .distinct()
+        .order_by(RoadSegment.city, RoadSegment.name)
+        .all()
+    )
+
+    # keyed dict so we can enrich in-place
+    data: dict[tuple, dict] = {
+        (r.name, r.city): {
+            "jams_count": 0,
+            "jams_total_length_m": 0.0,
+            "jams_avg_speed_kmh": None,
+            "jams_max_speed_kmh": None,
+            "jams_min_speed_kmh": None,
+            "accidents_count": 0,
+            "accidents_total_damage_czk": None,
+            "accidents_by_type": {},
+            "accidents_by_cause": {},
+            "restrictions_count": 0,
+            "alerts_count": 0,
+            "alerts_by_type": {},
+        }
+        for r in street_rows
+    }
+
+    # ── 2. Jams: counts + speed/length aggregates ──────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            func.count(TrafficJam.id).label("cnt"),
+            func.sum(TrafficJam.length_m).label("total_length"),
+            func.avg(TrafficJam.speed_kmh).label("avg_speed"),
+            func.max(TrafficJam.speed_kmh).label("max_speed"),
+            func.min(TrafficJam.speed_kmh).label("min_speed"),
+        )
+        .join(TrafficJam, TrafficJam.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            d = data[key]
+            d["jams_count"] = r.cnt
+            d["jams_total_length_m"] = float(r.total_length or 0)
+            d["jams_avg_speed_kmh"] = float(r.avg_speed) if r.avg_speed is not None else None
+            d["jams_max_speed_kmh"] = float(r.max_speed) if r.max_speed is not None else None
+            d["jams_min_speed_kmh"] = float(r.min_speed) if r.min_speed is not None else None
+
+    # ── 3. Accidents: count + total damage ────────────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            func.count(Accident.id).label("cnt"),
+            func.sum(Accident.damage_czk).label("total_damage"),
+        )
+        .join(Accident, Accident.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["accidents_count"] = r.cnt
+            data[key]["accidents_total_damage_czk"] = int(r.total_damage) if r.total_damage is not None else None
+
+    # ── 4. Accidents: type breakdown ──────────────────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            Accident.accident_type,
+            func.count(Accident.id).label("cnt"),
+        )
+        .join(Accident, Accident.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None), Accident.accident_type.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city, Accident.accident_type)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["accidents_by_type"][r.accident_type] = r.cnt
+
+    # ── 5. Accidents: cause breakdown ─────────────────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            Accident.cause_primary,
+            func.count(Accident.id).label("cnt"),
+        )
+        .join(Accident, Accident.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None), Accident.cause_primary.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city, Accident.cause_primary)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["accidents_by_cause"][r.cause_primary] = r.cnt
+
+    # ── 6. Restrictions: count ────────────────────────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            func.count(Restriction.id).label("cnt"),
+        )
+        .join(Restriction, Restriction.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["restrictions_count"] = r.cnt
+
+    # ── 7. Alerts: count + type breakdown ─────────────────────────────────
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            func.count(Alert.id).label("cnt"),
+        )
+        .join(Alert, Alert.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["alerts_count"] = r.cnt
+
+    for r in (
+        db.query(
+            RoadSegment.name,
+            RoadSegment.city,
+            Alert.alert_type,
+            func.count(Alert.id).label("cnt"),
+        )
+        .join(Alert, Alert.segment_id == RoadSegment.id)
+        .filter(RoadSegment.name.isnot(None), Alert.alert_type.isnot(None))
+        .group_by(RoadSegment.name, RoadSegment.city, Alert.alert_type)
+        .all()
+    ):
+        key = (r.name, r.city)
+        if key in data:
+            data[key]["alerts_by_type"][r.alert_type] = r.cnt
+
+    # ── 8. Build response ─────────────────────────────────────────────────
+    streets = [
+        StreetEnrichedItem(
+            name=name,
+            city=city,
+            jams_count=d["jams_count"],
+            jams_total_length_m=d["jams_total_length_m"],
+            jams_avg_speed_kmh=d["jams_avg_speed_kmh"],
+            jams_max_speed_kmh=d["jams_max_speed_kmh"],
+            jams_min_speed_kmh=d["jams_min_speed_kmh"],
+            accidents_count=d["accidents_count"],
+            accidents_total_damage_czk=d["accidents_total_damage_czk"],
+            accidents_by_type=[
+                AccidentTypeCount(accident_type=t, count=c)
+                for t, c in d["accidents_by_type"].items()
+            ],
+            accidents_by_cause=[
+                AccidentCauseCount(cause=c, count=n)
+                for c, n in d["accidents_by_cause"].items()
+            ],
+            restrictions_count=d["restrictions_count"],
+            alerts_count=d["alerts_count"],
+            alerts_by_type=[
+                AlertTypeCount(alert_type=t, count=c)
+                for t, c in d["alerts_by_type"].items()
+            ],
+        )
+        for (name, city), d in data.items()
+    ]
+
+    logger.info(f"Loaded {len(streets)} enriched streets from database")
+    return StreetsEnrichedResponse(streets=streets, total_count=len(streets))
 

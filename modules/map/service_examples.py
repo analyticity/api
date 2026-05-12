@@ -17,6 +17,13 @@ from modules.map.schema import (
     EventLinkResponse,
     EventLinksResponse,
     NearestStreetResponse,
+    StreetItem,
+    StreetsResponse,
+    StreetEnrichedItem,
+    StreetsEnrichedResponse,
+    AccidentTypeCount,
+    AccidentCauseCount,
+    AlertTypeCount,
 )
 from core.example_data import ExampleDataLoader
 from core.logging_config import get_logger
@@ -507,4 +514,61 @@ def get_nearest_street_from_example(
         nearest_segment_id=nearest_id,
         distance_m=0.0
     )
+
+
+def get_streets_from_example() -> StreetsResponse:
+    """Return distinct (name, city) pairs from example road segments."""
+
+    segments_data = ExampleDataLoader.get_road_segments(None)
+    seen = set()
+    streets = []
+    for seg in segments_data:
+        name = seg.get("name")
+        city = seg.get("city")
+        if name is None:
+            continue
+        key = (name, city)
+        if key not in seen:
+            seen.add(key)
+            streets.append(StreetItem(name=name, city=city))
+
+    streets.sort(key=lambda s: (s.city or "", s.name or ""))
+    logger.info(f"Loaded {len(streets)} distinct streets from example data")
+    return StreetsResponse(streets=streets, total_count=len(streets))
+
+
+def get_streets_enriched_from_example() -> StreetsEnrichedResponse:
+    """Return distinct (name, city) pairs with zero-filled statistics from example data."""
+
+    segments_data = ExampleDataLoader.get_road_segments(None)
+    seen = set()
+    streets = []
+    for seg in segments_data:
+        name = seg.get("name")
+        city = seg.get("city")
+        if name is None:
+            continue
+        key = (name, city)
+        if key not in seen:
+            seen.add(key)
+            streets.append(StreetEnrichedItem(
+                name=name,
+                city=city,
+                jams_count=0,
+                jams_total_length_m=0.0,
+                jams_avg_speed_kmh=None,
+                jams_max_speed_kmh=None,
+                jams_min_speed_kmh=None,
+                accidents_count=0,
+                accidents_total_damage_czk=None,
+                accidents_by_type=[],
+                accidents_by_cause=[],
+                restrictions_count=0,
+                alerts_count=0,
+                alerts_by_type=[],
+            ))
+
+    streets.sort(key=lambda s: (s.city or "", s.name or ""))
+    logger.info(f"Loaded {len(streets)} enriched streets from example data")
+    return StreetsEnrichedResponse(streets=streets, total_count=len(streets))
 
