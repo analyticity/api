@@ -9,7 +9,7 @@ services:
       - ./Admin-Backend:/app/Admin-Backend
     container_name: Admin-Backend
     ports:
-      - "8020:8020"
+      - "${ADMIN_BACKEND_PORT}:8082"
     networks:
       - analyticity-network
 

@@ -253,6 +253,26 @@ def get_nearest_street(
         return get_nearest_street_from_example(lat, lon, date_from, date_to)
 
 
+def get_nearest_street(
+    db: Optional[Session],
+    lat: float,
+    lon: float,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> Optional[NearestStreetResponse]:
+    """Find nearest street segment with automatic fallback to example data."""
+
+    if db is None:
+        logger.warning("Database unavailable, using example data fallback")
+        return get_nearest_street_from_example(lat, lon, date_from, date_to)
+
+    try:
+        return get_nearest_street_from_db(db, lat, lon, date_from, date_to)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}. Falling back to example data")
+        return get_nearest_street_from_example(lat, lon, date_from, date_to)
+
+
 def get_event_links_by_target(
     db: Optional[Session],
     target_ids: List[int],
