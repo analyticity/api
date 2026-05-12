@@ -4,7 +4,6 @@
 
 # Python
 __pycache__/
-AdminBackend/Admin-Backend/__pycache__
 *.py[cod]
 *$py.class
 *.so

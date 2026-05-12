@@ -16,6 +16,7 @@ DB_NAME = os.getenv("POSTGRES_DB_BRNO")
 DB_USER = os.getenv("POSTGRES_USER_BRNO")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD_BRNO")
 
+_db_available = None
 _engine = None
 _SessionLocal = None
 _credentials_ok = None

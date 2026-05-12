@@ -17,7 +17,7 @@ COPY ./Admin-Backend ./Admin-Backend
 WORKDIR /app/Admin-Backend
 
 # Expose FastAPI port
-EXPOSE 8020
+EXPOSE 8082
 
 # Start FastAPI
-CMD ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8020"]
+CMD ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8082"]
