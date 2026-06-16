@@ -75,7 +75,7 @@ class ClusterAccident(Base):
         index=True,
     )
     accident_id = Column(
-        String(50),
+        BigInteger,
         ForeignKey("accidents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
