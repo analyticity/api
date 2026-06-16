@@ -15,7 +15,7 @@ from app.database import Base
 class Accident(Base):
     __tablename__ = "accidents"
 
-    id = Column(String(50), primary_key=True)
+    id = Column(BigInteger, primary_key=True)
 
     # Time
     event_time = Column(DateTime(timezone=True), nullable=True)
