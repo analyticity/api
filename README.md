@@ -121,4 +121,23 @@ Database contains traffic and geographic data from various sources (Waze, Czech 
 - For development without database use CSV data in `example_data_from_database/`
 - Database models are shared in `/models` for use across all modules
 
+## License
 
+Copyright (C) 2026 Magdaléna Ondrušková
+
+This program is free software: you can redistribute it and/or
+modify it under the terms of the
+[GNU Affero General Public License](LICENSE) as published by
+the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+**What this means in practice.** You are free to use, study,
+modify and redistribute this software, including for research
+and teaching. If you modify it and make it available to others
+over a network — for example by running your own instance of
+the dashboard or API — you must offer those users the complete
+corresponding source code of your modified version, under the
+same license.
+
+If you use this software in academic work, please cite it — see
+[CITATION.cff](CITATION.cff).
